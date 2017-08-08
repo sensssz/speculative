@@ -1,14 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 
 	"bufio"
 
 	"os"
-
-	"strings"
 
 	sqp "github.com/sensssz/speculative"
 	sp "github.com/sensssz/spinner"
@@ -40,17 +40,16 @@ func (p PairList) Less(i, j int) bool { return p[i].Frequency < p[j].Frequency }
 func (p PairList) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
 func main() {
-	modelBuilder := sqp.NewModelBuilder("/home/jiamin/sql.log")
+	postfix := ".lobsters"
+	modelBuilder := sqp.NewModelBuilder("/home/jiamin/sql_log/sql" + postfix)
 	var total int64
 	var totalSelect int64
-	var userID int64
 	var match int64
 	var numTrx int64
 	var wrongPrediction int64
 	var unpredictale int64
 	total = 0
 	totalSelect = 0
-	userID = 0
 	match = 0
 	wrongPrediction = 0
 	unpredictale = 0
@@ -71,7 +70,10 @@ func main() {
 	predictor := pt.NewPredictor(modelBuilder.QuerySet)
 	spinner = sp.NewSpinnerWithProgress(19, "Performaning preduction for cluster %d...", -1)
 	spinner.Start()
-	clusterInfoFile, _ := os.Create("clusterInfo")
+	clustersFile, _ := os.Create("clusters" + postfix)
+	defer clustersFile.Close()
+	clustersWriter := bufio.NewWriter(clustersFile)
+	clusterInfoFile, _ := os.Create("clusterInfo" + postfix)
 	defer clusterInfoFile.Close()
 	fileWriter := bufio.NewWriter(clusterInfoFile)
 	pl := make(PairList, 0, len(modelBuilder.Clusters))
@@ -104,11 +106,7 @@ func main() {
 						totalSelectOfTrx++
 					}
 				}
-				actualSQL := query.GetSQL(modelBuilder.QuerySet)
-				if strings.Contains(actualSQL, "`user`.`id` = ") ||
-					strings.Contains(actualSQL, ".`user_id` = ") {
-					userID++
-				}
+				// actualSQL := query.GetSQL(modelBuilder.QuerySet)
 				prediction := predictor.PredictNextQuery()
 				if query.Same(prediction) {
 					match++
@@ -142,6 +140,28 @@ func main() {
 			fileWriter.WriteString(query.GetSQL(modelBuilder.QuerySet) + "\n")
 		}
 		fileWriter.WriteString("\n")
+	}
+
+	if len(os.Args) == 2 {
+		numClustersToWrite, _ := strconv.Atoi(os.Args[1])
+		for i, pair := range pl {
+			if i >= numClustersToWrite {
+				break
+			}
+			for _, trx := range modelBuilder.Clusters[pair.ClusterID] {
+				clustersWriter.WriteString(`{"sql":"BEGIN","results":{}}` + "\n")
+				for _, query := range trx {
+					sql := query.GetSQL(modelBuilder.QuerySet)
+					queryMap := make(map[string]interface{})
+					queryMap["sql"] = sql
+					queryMap["results"] = query.ResultSet
+					jsonString, _ := json.Marshal(queryMap)
+					clustersWriter.WriteString(string(jsonString) + "\n")
+				}
+				clustersWriter.WriteString(`{"sql":"COMMIT","results":{}}` + "\n")
+			}
+		}
+		clustersWriter.Flush()
 	}
 	spinner.Stop()
 	fileWriter.WriteString(fmt.Sprintf("Hit count: %v\n", match))

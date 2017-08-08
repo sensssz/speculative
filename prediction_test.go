@@ -265,3 +265,23 @@ func TestBuildOrUpdateTrees(t *testing.T) {
 		predictor.MoveToNext(query)
 	}
 }
+
+func TestBuildOrUpdateSingleTree(t *testing.T) {
+	modelBuilder := NewModelBuilder("test/single_tree")
+	pt := NewPredictionTrees()
+	for i, cluster := range modelBuilder.Clusters {
+		fmt.Printf("Cluster %d\n", i)
+		modelBuilder.UpdateModel(cluster, pt)
+	}
+	targetCluster := modelBuilder.Clusters[1]
+	fmt.Println(pt.GetTreeWithRoot(targetCluster[0][0].QueryID, 0).ToString())
+
+	predictor := pt.NewPredictor(modelBuilder.QuerySet)
+	trx := targetCluster[0]
+	predictor.MoveToNext(trx[0])
+	for _, query := range trx[1:] {
+		prediction := predictor.PredictNextQuery()
+		fmt.Printf("%+v\n", prediction)
+		predictor.MoveToNext(query)
+	}
+}
