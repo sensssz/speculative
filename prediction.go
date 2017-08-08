@@ -694,11 +694,12 @@ func (builder *ModelBuilder) UpdateModel(transactions [][]*Query, pt *Prediction
 				strOpsLen := len(strOpsAllQueries)
 				numListOpsLen := len(numListOpsAllQueries)
 				strListOpsLen := len(strListOpsAllQueries)
-				numOpsLast5 := numOpsAllQueries[nonNegative(numOpsLen-5):numOpsLen]
-				strOpsLast5 := strOpsAllQueries[nonNegative(strOpsLen-5):strOpsLen]
-				numListOpsLast5 := numListOpsAllQueries[nonNegative(numListOpsLen-5):numListOpsLen]
-				strListOpsLast5 := strListOpsAllQueries[nonNegative(strListOpsLen-5):strListOpsLen]
-				predictionsForThisQuery = builder.enumeratePredictionsForQuery(node, firstTen, i, numOpsLast5, strOpsLast5, numListOpsLast5, strListOpsLast5)
+				lastN := 7
+				numOpsLastN := numOpsAllQueries[nonNegative(numOpsLen-lastN):numOpsLen]
+				strOpsLastN := strOpsAllQueries[nonNegative(strOpsLen-lastN):strOpsLen]
+				numListOpsLastN := numListOpsAllQueries[nonNegative(numListOpsLen-lastN):numListOpsLen]
+				strListOpsLastN := strListOpsAllQueries[nonNegative(strListOpsLen-lastN):strListOpsLen]
+				predictionsForThisQuery = builder.enumeratePredictionsForQuery(node, firstTen, i, numOpsLastN, strOpsLastN, numListOpsLastN, strListOpsLastN)
 				node.AddChildren(predictionsForThisQuery)
 			}
 			matchedPredictions := make([]*Node, 0, len(predictionsForThisQuery))
