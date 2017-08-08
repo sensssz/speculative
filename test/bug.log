@@ -1,0 +1,63 @@
+{"sql":"BEGIN","results":{}}
+{"sql":"SELECT  `users`.* FROM `users`  WHERE `users`.`id` = 313 LIMIT 1","results":[[313,"karli_fahey","karli_fahey@mccullough.io","$2a$10$bkeKhKrlxklHmfB3cgW7SOt7.SsQ35sovVr5MRaBdAhDqXQv2zH9m","2016-04-27T17:32:18.000Z",0,0,null,"lopML9OGGq1BPVBw4AbMcK8TgNCRCQMddqNbNTmPqYP9zoVbSV2oGhK3SGHG","",1,0,0,null,1,1,0,0,0,"p9LldFnmciZ6D666e4tp6uT5cR4LmUYGhgLpmU5iqlaakBYZgJymT08Jrcou","IlsUSUJLlM",0,0,null,null,null,null,0,0]]}
+{"sql":"SELECT  `users`.* FROM `users`  WHERE `users`.`id` = 2 LIMIT 1","results":[[2,"sonia","sonia@roberts.com","$2a$10$6zY0PVEnp3kyRrOPUa7E3ufXq4btaRFcF6KtHpY85j1YiWvnUbQvu","2016-04-27T16:56:08.000Z",0,0,null,"A7MzKmhB4OBIwvXTxNdUaAN5ynuRy5boqsdVOFw2KIP5xPhLVGIK1UCtC7Wf","",1,0,0,null,1,1,0,0,0,"Wl966pwJy0lxK1Vdpvuqh77ShCnSfxT5agUdUeSnFDeuDWra4AaE1gs9fe28","Gc4oJ7Des3",0,0,null,null,null,null,0,0]]}
+{"sql":"INSERT INTO `messages` (`author_user_id`, `body`, `created_at`, `recipient_user_id`, `short_id`, `subject`) VALUES (2, 'WEK_R', '2017-01-24 18:00:00', 313, 'st63jv', '_9a')","results":{}}
+{"sql":"SELECT COUNT(*) FROM `messages`  WHERE `messages`.`recipient_user_id` = 313 AND `messages`.`has_been_read` = 0 AND `messages`.`deleted_by_recipient` = 0","results":[[119]]}
+{"sql":"INSERT INTO keystores (`key`, `value`) VALUES ('user:313:unread_messages', 119) ON DUPLICATE KEY UPDATE `value` = 119","results":{}}
+{"sql":"COMMIT","results":{}}
+
+{"sql":"BEGIN","results":{}}
+{"sql":"SELECT  `users`.* FROM `users`  WHERE `users`.`id` = 8 LIMIT 1","results":[[8,"urban","urban@hicklecollier.co","$2a$10$wQL2/A4FFstYlUpVZCkxiub9JSzoH.GJj5hhKD/eEFsGMPdvBh2qC","2016-04-27T16:56:54.000Z",0,0,null,"dZCRIX8OilFZJvsY9avlXEtuL6jt2hqnd1w9LizasNMe9EDY0g0q42ow1F9L","",1,0,0,null,1,1,0,0,0,"6fmh2AABrcH8iTCIMVafNH78ShIesoBtE9QxdUYwYofufT3nlhla5EWHWa7w","WxYQf5wsN2",0,0,null,null,null,null,0,0]]}
+{"sql":"SELECT  `users`.* FROM `users`  WHERE `users`.`id` = 365 LIMIT 1","results":[[365,"kayley_daugherty","kayley_daugherty@boehm.biz","$2a$10$oRUCz4O30zYFfy1TNULIuu2boGCEGp1xrztQ7FeLlCMJFuoyiN.vG","2016-04-27T17:37:46.000Z",0,0,null,"4sqWDg0wK0KxPuvaz1LBST0X8OaKJSJJUgHo0OcYvTINrGhonA4kPHTZKqIW","",1,0,0,null,1,1,0,0,0,"eIHM0FIg1hucElvcy9EguCDgb7ohtVXvRmQ7a5TL1hZHWHHBiLc0QQA5QrHH","ZPTbFb2az6",0,0,null,null,null,null,0,0]]}
+{"sql":"UPDATE `messages` SET `deleted_by_recipient` = 1 WHERE `messages`.`id` = 173","results":{}}
+{"sql":"SELECT COUNT(*) FROM `messages`  WHERE `messages`.`recipient_user_id` = 8 AND `messages`.`has_been_read` = 0 AND `messages`.`deleted_by_recipient` = 0","results":[[103]]}
+{"sql":"INSERT INTO keystores (`key`, `value`) VALUES ('user:8:unread_messages', 103) ON DUPLICATE KEY UPDATE `value` = 103","results":{}}
+{"sql":"COMMIT","results":{}}
+
+{"sql":"BEGIN","results":{}}
+{"sql":"SELECT  `users`.* FROM `users`  WHERE `users`.`id` = 8 LIMIT 1","results":[[8,"urban","urban@hicklecollier.co","$2a$10$wQL2/A4FFstYlUpVZCkxiub9JSzoH.GJj5hhKD/eEFsGMPdvBh2qC","2016-04-27T16:56:54.000Z",0,0,null,"dZCRIX8OilFZJvsY9avlXEtuL6jt2hqnd1w9LizasNMe9EDY0g0q42ow1F9L","",1,0,0,null,1,1,0,0,0,"6fmh2AABrcH8iTCIMVafNH78ShIesoBtE9QxdUYwYofufT3nlhla5EWHWa7w","WxYQf5wsN2",0,0,null,null,null,null,0,0]]}
+{"sql":"SELECT  `users`.* FROM `users`  WHERE `users`.`id` = 212 LIMIT 1","results":[[212,"mayra","mayra@bahringer.biz","$2a$10$eKECwlrOi1Wc8iL1Vb86VOSNt5mP8uyck6ZFfeQu9CdmKVFgORjM2","2016-04-27T17:21:01.000Z",0,0,null,"9W4tzCblPwcTxntmxnV7ggFCaV1gKxxhUQhV2sp33oogLI5zZkV20XUEjVwE","",1,0,0,null,1,1,0,0,0,"7dyA5dkPZmqSocCK0yFRQXUAgKIWRODvGM27DMHvfsIzdTclRtGgTdwxOiLH","9YOFdHlWjv",0,0,null,null,null,null,0,0]]}
+{"sql":"UPDATE `messages` SET `deleted_by_recipient` = 1 WHERE `messages`.`id` = 623","results":{}}
+{"sql":"SELECT COUNT(*) FROM `messages`  WHERE `messages`.`recipient_user_id` = 8 AND `messages`.`has_been_read` = 0 AND `messages`.`deleted_by_recipient` = 0","results":[[102]]}
+{"sql":"INSERT INTO keystores (`key`, `value`) VALUES ('user:8:unread_messages', 102) ON DUPLICATE KEY UPDATE `value` = 102","results":{}}
+{"sql":"COMMIT","results":{}}
+
+{"sql":"BEGIN","results":{}}
+{"sql":"SELECT  `users`.* FROM `users`  WHERE `users`.`id` = 8 LIMIT 1","results":[[8,"urban","urban@hicklecollier.co","$2a$10$wQL2/A4FFstYlUpVZCkxiub9JSzoH.GJj5hhKD/eEFsGMPdvBh2qC","2016-04-27T16:56:54.000Z",0,0,null,"dZCRIX8OilFZJvsY9avlXEtuL6jt2hqnd1w9LizasNMe9EDY0g0q42ow1F9L","",1,0,0,null,1,1,0,0,0,"6fmh2AABrcH8iTCIMVafNH78ShIesoBtE9QxdUYwYofufT3nlhla5EWHWa7w","WxYQf5wsN2",0,0,null,null,null,null,0,0]]}
+{"sql":"SELECT  `users`.* FROM `users`  WHERE `users`.`id` = 421 LIMIT 1","results":[[421,"willis","willis@halvorsonwalter.biz","$2a$10$fW0jkly11IAKJXP/Ugy.p.iiGXDx9r0/N5v6iPht634ijs3n70H76","2016-04-27T17:43:39.000Z",0,0,null,"Za9uS2NThdUAIdkVSsSOv3gQkOs1CwlPPdLtPEXhR970nFhNPIrVKgY5pDfq","",1,0,0,null,1,1,0,0,0,"4k5ynGcOmVW2Euw84WdvaVmaPr4SYOw6SyIdotQlaqDkFooY9M14xBPTRThh","AazvB6EgKk",0,0,null,null,null,null,0,0]]}
+{"sql":"UPDATE `messages` SET `deleted_by_recipient` = 1 WHERE `messages`.`id` = 1018","results":{}}
+{"sql":"SELECT COUNT(*) FROM `messages`  WHERE `messages`.`recipient_user_id` = 8 AND `messages`.`has_been_read` = 0 AND `messages`.`deleted_by_recipient` = 0","results":[[101]]}
+{"sql":"INSERT INTO keystores (`key`, `value`) VALUES ('user:8:unread_messages', 101) ON DUPLICATE KEY UPDATE `value` = 101","results":{}}
+{"sql":"COMMIT","results":{}}
+
+{"sql":"BEGIN","results":{}}
+{"sql":"SELECT  `users`.* FROM `users`  WHERE `users`.`id` = 313 LIMIT 1","results":[[313,"karli_fahey","karli_fahey@mccullough.io","$2a$10$bkeKhKrlxklHmfB3cgW7SOt7.SsQ35sovVr5MRaBdAhDqXQv2zH9m","2016-04-27T17:32:18.000Z",0,0,null,"lopML9OGGq1BPVBw4AbMcK8TgNCRCQMddqNbNTmPqYP9zoVbSV2oGhK3SGHG","",1,0,0,null,1,1,0,0,0,"p9LldFnmciZ6D666e4tp6uT5cR4LmUYGhgLpmU5iqlaakBYZgJymT08Jrcou","IlsUSUJLlM",0,0,null,null,null,null,0,0]]}
+{"sql":"SELECT  `users`.* FROM `users`  WHERE `users`.`id` = 2 LIMIT 1","results":[[2,"sonia","sonia@roberts.com","$2a$10$6zY0PVEnp3kyRrOPUa7E3ufXq4btaRFcF6KtHpY85j1YiWvnUbQvu","2016-04-27T16:56:08.000Z",0,0,null,"A7MzKmhB4OBIwvXTxNdUaAN5ynuRy5boqsdVOFw2KIP5xPhLVGIK1UCtC7Wf","",1,0,0,null,1,1,0,0,0,"Wl966pwJy0lxK1Vdpvuqh77ShCnSfxT5agUdUeSnFDeuDWra4AaE1gs9fe28","Gc4oJ7Des3",0,0,null,null,null,null,0,0]]}
+{"sql":"INSERT INTO `messages` (`author_user_id`, `body`, `created_at`, `recipient_user_id`, `short_id`, `subject`) VALUES (2, 'WEK_R', '2017-01-24 18:00:00', 313, 'st63jv', '_9a')","results":{}}
+{"sql":"SELECT COUNT(*) FROM `messages`  WHERE `messages`.`recipient_user_id` = 313 AND `messages`.`has_been_read` = 0 AND `messages`.`deleted_by_recipient` = 0","results":[[119]]}
+{"sql":"INSERT INTO keystores (`key`, `value`) VALUES ('user:313:unread_messages', 119) ON DUPLICATE KEY UPDATE `value` = 119","results":{}}
+{"sql":"COMMIT","results":{}}
+
+{"sql":"BEGIN","results":{}}
+{"sql":"SELECT  `users`.* FROM `users`  WHERE `users`.`id` = 8 LIMIT 1","results":[[8,"urban","urban@hicklecollier.co","$2a$10$wQL2/A4FFstYlUpVZCkxiub9JSzoH.GJj5hhKD/eEFsGMPdvBh2qC","2016-04-27T16:56:54.000Z",0,0,null,"dZCRIX8OilFZJvsY9avlXEtuL6jt2hqnd1w9LizasNMe9EDY0g0q42ow1F9L","",1,0,0,null,1,1,0,0,0,"6fmh2AABrcH8iTCIMVafNH78ShIesoBtE9QxdUYwYofufT3nlhla5EWHWa7w","WxYQf5wsN2",0,0,null,null,null,null,0,0]]}
+{"sql":"SELECT  `users`.* FROM `users`  WHERE `users`.`id` = 365 LIMIT 1","results":[[365,"kayley_daugherty","kayley_daugherty@boehm.biz","$2a$10$oRUCz4O30zYFfy1TNULIuu2boGCEGp1xrztQ7FeLlCMJFuoyiN.vG","2016-04-27T17:37:46.000Z",0,0,null,"4sqWDg0wK0KxPuvaz1LBST0X8OaKJSJJUgHo0OcYvTINrGhonA4kPHTZKqIW","",1,0,0,null,1,1,0,0,0,"eIHM0FIg1hucElvcy9EguCDgb7ohtVXvRmQ7a5TL1hZHWHHBiLc0QQA5QrHH","ZPTbFb2az6",0,0,null,null,null,null,0,0]]}
+{"sql":"UPDATE `messages` SET `deleted_by_recipient` = 1 WHERE `messages`.`id` = 173","results":{}}
+{"sql":"SELECT COUNT(*) FROM `messages`  WHERE `messages`.`recipient_user_id` = 8 AND `messages`.`has_been_read` = 0 AND `messages`.`deleted_by_recipient` = 0","results":[[103]]}
+{"sql":"INSERT INTO keystores (`key`, `value`) VALUES ('user:8:unread_messages', 103) ON DUPLICATE KEY UPDATE `value` = 103","results":{}}
+{"sql":"COMMIT","results":{}}
+
+{"sql":"BEGIN","results":{}}
+{"sql":"SELECT  `users`.* FROM `users`  WHERE `users`.`id` = 8 LIMIT 1","results":[[8,"urban","urban@hicklecollier.co","$2a$10$wQL2/A4FFstYlUpVZCkxiub9JSzoH.GJj5hhKD/eEFsGMPdvBh2qC","2016-04-27T16:56:54.000Z",0,0,null,"dZCRIX8OilFZJvsY9avlXEtuL6jt2hqnd1w9LizasNMe9EDY0g0q42ow1F9L","",1,0,0,null,1,1,0,0,0,"6fmh2AABrcH8iTCIMVafNH78ShIesoBtE9QxdUYwYofufT3nlhla5EWHWa7w","WxYQf5wsN2",0,0,null,null,null,null,0,0]]}
+{"sql":"SELECT  `users`.* FROM `users`  WHERE `users`.`id` = 212 LIMIT 1","results":[[212,"mayra","mayra@bahringer.biz","$2a$10$eKECwlrOi1Wc8iL1Vb86VOSNt5mP8uyck6ZFfeQu9CdmKVFgORjM2","2016-04-27T17:21:01.000Z",0,0,null,"9W4tzCblPwcTxntmxnV7ggFCaV1gKxxhUQhV2sp33oogLI5zZkV20XUEjVwE","",1,0,0,null,1,1,0,0,0,"7dyA5dkPZmqSocCK0yFRQXUAgKIWRODvGM27DMHvfsIzdTclRtGgTdwxOiLH","9YOFdHlWjv",0,0,null,null,null,null,0,0]]}
+{"sql":"UPDATE `messages` SET `deleted_by_recipient` = 1 WHERE `messages`.`id` = 623","results":{}}
+{"sql":"SELECT COUNT(*) FROM `messages`  WHERE `messages`.`recipient_user_id` = 8 AND `messages`.`has_been_read` = 0 AND `messages`.`deleted_by_recipient` = 0","results":[[102]]}
+{"sql":"INSERT INTO keystores (`key`, `value`) VALUES ('user:8:unread_messages', 102) ON DUPLICATE KEY UPDATE `value` = 102","results":{}}
+{"sql":"COMMIT","results":{}}
+
+{"sql":"BEGIN","results":{}}
+{"sql":"SELECT  `users`.* FROM `users`  WHERE `users`.`id` = 8 LIMIT 1","results":[[8,"urban","urban@hicklecollier.co","$2a$10$wQL2/A4FFstYlUpVZCkxiub9JSzoH.GJj5hhKD/eEFsGMPdvBh2qC","2016-04-27T16:56:54.000Z",0,0,null,"dZCRIX8OilFZJvsY9avlXEtuL6jt2hqnd1w9LizasNMe9EDY0g0q42ow1F9L","",1,0,0,null,1,1,0,0,0,"6fmh2AABrcH8iTCIMVafNH78ShIesoBtE9QxdUYwYofufT3nlhla5EWHWa7w","WxYQf5wsN2",0,0,null,null,null,null,0,0]]}
+{"sql":"SELECT  `users`.* FROM `users`  WHERE `users`.`id` = 421 LIMIT 1","results":[[421,"willis","willis@halvorsonwalter.biz","$2a$10$fW0jkly11IAKJXP/Ugy.p.iiGXDx9r0/N5v6iPht634ijs3n70H76","2016-04-27T17:43:39.000Z",0,0,null,"Za9uS2NThdUAIdkVSsSOv3gQkOs1CwlPPdLtPEXhR970nFhNPIrVKgY5pDfq","",1,0,0,null,1,1,0,0,0,"4k5ynGcOmVW2Euw84WdvaVmaPr4SYOw6SyIdotQlaqDkFooY9M14xBPTRThh","AazvB6EgKk",0,0,null,null,null,null,0,0]]}
+{"sql":"UPDATE `messages` SET `deleted_by_recipient` = 1 WHERE `messages`.`id` = 1018","results":{}}
+{"sql":"SELECT COUNT(*) FROM `messages`  WHERE `messages`.`recipient_user_id` = 8 AND `messages`.`has_been_read` = 0 AND `messages`.`deleted_by_recipient` = 0","results":[[101]]}
+{"sql":"INSERT INTO keystores (`key`, `value`) VALUES ('user:8:unread_messages', 101) ON DUPLICATE KEY UPDATE `value` = 101","results":{}}
+{"sql":"COMMIT","results":{}}
