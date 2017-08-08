@@ -1,0 +1,12 @@
+Result set iteration
+
+SEATS.FindFlights
+twitter.GetFollowers
+twitter.GetTweetsFromFollowing
+wikipedia.UpdatePage
+TPCC.NewOrder
+
+Calculation
+voter.Vote
+
+
