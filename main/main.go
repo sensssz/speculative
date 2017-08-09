@@ -46,7 +46,7 @@ func main() {
 	predictor := gm.NewPredictor(modelBuilder.QuerySet)
 	spinner := sp.NewSpinnerWithProgress(19, "Performaning prediction for query %d...", -1)
 	spinner.Start()
-	total = len(queries) - thirtyPercent
+	total = int64(len(queries) - thirtyPercent)
 	for i, query := range queries[thirtyPercent:] {
 		spinner.UpdateProgress(i)
 		prediction := predictor.PredictNextQuery()
