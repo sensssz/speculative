@@ -144,9 +144,9 @@ func (gm *GraphModel) GetEdgeList(queryID int) *EdgeList {
 func (gm *GraphModel) Print() {
 	fmt.Fprintf(os.Stderr, "Graph Model:\n")
 	for queryID, edgeList := range gm.vertexEdges {
-		fmt.Fprintf(os.Stderr, "%v:[\n", queryID)
+		fmt.Fprintf(os.Stderr, "%v: [\n", queryID)
 		for toQuery, edge := range edgeList.Edges {
-			fmt.Fprintf(os.Stderr, "  %v: {\n", toQuery)
+			fmt.Fprintf(os.Stderr, "  %v: { %v\n", toQuery, edge.Weight)
 			for path, predictions := range edge.Predictions {
 				fmt.Fprintf(os.Stderr, "    %v: [%v]\n", path, len(predictions))
 			}
@@ -463,6 +463,7 @@ func (builder *ModelBuilder) UpdateGraphModel(lastNQueries []*Query, query *Quer
 	edge := gm.GetEdgeList(builder.Current.QueryID).GetEdge(query.QueryID)
 	edge.IncWeight()
 	path := builder.QueryQueue.GenPath()
+	builder.Current = query
 	matches := edge.FindMatchingPredictions(query, lastNQueries, path)
 	if len(matches) == 0 {
 		matches = builder.enumeratePredictionsForCurrentQuery(lastNQueries)
@@ -471,7 +472,6 @@ func (builder *ModelBuilder) UpdateGraphModel(lastNQueries []*Query, query *Quer
 	for _, prediction := range matches {
 		prediction.Hit()
 	}
-	builder.Current = query
 	builder.QueryQueue.MoveToNextQuery(query.QueryID)
 }
 

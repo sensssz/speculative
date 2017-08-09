@@ -2,7 +2,6 @@ package speculative
 
 import (
 	"fmt"
-	"os"
 	"strings"
 )
 
@@ -296,13 +295,7 @@ func (e *Edge) IncWeight() {
 
 // FindBestMatchWithPath returns the best prediction given the path.
 func (e *Edge) FindBestMatchWithPath(path *QueryPath) *Prediction {
-	predictions, exists := e.Predictions[*path]
-	if !exists {
-		fmt.Fprintf(os.Stderr, "Path not found\n")
-		// for _, predictionsForPath := range e.Predictions {
-		// 	predictions = append(predictions, predictionsForPath...)
-		// }
-	}
+	predictions, _ := e.Predictions[*path]
 	var best *Prediction
 	best = nil
 	for _, prediction := range predictions {
