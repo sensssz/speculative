@@ -175,9 +175,9 @@ func (queryParser *QueryParser) ParseQuery(text string) *Query {
 		panic(err)
 	}
 	sql := queryJSON["sql"].(string)
-	if sql == "BEGIN" || sql == "COMMIT" {
-		return nil
-	}
+	// if sql == "BEGIN" || sql == "COMMIT" {
+	// 	return nil
+	// }
 	resLen := 0
 	resultAsSlice, success := queryJSON["results"].([]interface{})
 	if success {

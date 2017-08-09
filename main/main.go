@@ -39,27 +39,39 @@ func main() {
 	wrongPrediction = 0
 	unpredictale = 0
 	gm := sqp.NewGraphModel()
-	queries := modelBuilder.Queries
-	thirtyPercent := int(float64(len(queries)) * 0.3)
-	modelBuilder.TrainModel(gm, thirtyPercent)
-	gm.Print()
-	predictor := gm.NewPredictor(modelBuilder.QuerySet)
-	spinner := sp.NewSpinnerWithProgress(19, "Performaning prediction for query %d...", -1)
+	spinner := sp.NewSpinnerWithProgress(19, "Updating model with cluster %d...", -1)
 	spinner.Start()
-	total = int64(len(queries) - thirtyPercent)
-	for i, query := range queries[thirtyPercent:] {
+	for i, cluster := range modelBuilder.Clusters {
 		spinner.UpdateProgress(i)
-		prediction := predictor.PredictNextQuery()
-		if query.Same(prediction) {
-			match++
-		} else if prediction != nil {
-			wrongPrediction++
-		} else {
-			unpredictale++
+		thirtyPercent := int(float64(len(cluster)) * 0.3)
+		for _, trx := range cluster[:thirtyPercent] {
+			modelBuilder.TrainModel(gm, trx)
 		}
-		predictor.MoveToNext(query)
 	}
 	spinner.Stop()
+	gm.Print()
+	spinner = sp.NewSpinnerWithProgress(19, "Performaning prediction for cluster %d...", -1)
+	spinner.Start()
+	for i, cluster := range modelBuilder.Clusters {
+		spinner.UpdateProgress(i)
+		thirtyPercent := int(float64(len(cluster)) * 0.3)
+		for _, trx := range cluster[thirtyPercent:] {
+			predictor := gm.NewPredictor(modelBuilder.QuerySet)
+			for _, query := range trx {
+				prediction := predictor.PredictNextQuery()
+				if query.Same(prediction) {
+					match++
+				} else if prediction != nil {
+					wrongPrediction++
+				} else {
+					unpredictale++
+				}
+				predictor.MoveToNext(query)
+			}
+		}
+	}
+	spinner.Stop()
+
 	fmt.Printf("Hit count: %v\n", match)
 	fmt.Printf("Unpredictable: %v\n", unpredictale)
 	fmt.Printf("Wrong prediction: %v\n", wrongPrediction)

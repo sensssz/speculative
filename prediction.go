@@ -9,6 +9,7 @@ import (
 
 	"log"
 
+	"github.com/davecgh/go-spew/spew"
 	sp "github.com/sensssz/spinner"
 )
 
@@ -166,6 +167,8 @@ func (gm *GraphModel) NewPredictor(manager QueryManager) *Predictor {
 type ModelBuilder struct {
 	QuerySet             *QuerySet
 	Queries              []*Query
+	Transactions         [][]*Query
+	Clusters             [][][]*Query
 	QueryQueue           *QueryQueue
 	Current              *Query
 	NumOpsAllQueries     [][]Operand
@@ -176,15 +179,19 @@ type ModelBuilder struct {
 
 // NewModelBuilder creates a new ModelBuilder
 func NewModelBuilder(path string) *ModelBuilder {
-	builder := &ModelBuilder{NewQuerySet(), []*Query{}, NewQueryQueue(), nil, [][]Operand{}, [][]Operand{}, [][]Operand{}, [][]Operand{}}
+	builder := &ModelBuilder{NewQuerySet(), []*Query{}, [][]*Query{}, [][][]*Query{}, NewQueryQueue(), nil, [][]Operand{}, [][]Operand{}, [][]Operand{}, [][]Operand{}}
 	builder.parseQueriesFromFile(path)
+	builder.splitTransactions(true)
+	builder.clusterTransactions()
 	return builder
 }
 
 // NewModelBuilderFromContent creates a new ModelBuilder using the given queries
 func NewModelBuilderFromContent(queries string) *ModelBuilder {
-	builder := &ModelBuilder{NewQuerySet(), []*Query{}, NewQueryQueue(), nil, [][]Operand{}, [][]Operand{}, [][]Operand{}, [][]Operand{}}
+	builder := &ModelBuilder{NewQuerySet(), []*Query{}, [][]*Query{}, [][][]*Query{}, NewQueryQueue(), nil, [][]Operand{}, [][]Operand{}, [][]Operand{}, [][]Operand{}}
 	builder.parseQueries(queries)
+	builder.splitTransactions(true)
+	builder.clusterTransactions()
 	return builder
 }
 
@@ -229,6 +236,84 @@ func (builder *ModelBuilder) parseQueries(queries string) {
 		if query != nil {
 			builder.Queries = append(builder.Queries, query)
 		}
+	}
+}
+
+func (builder *ModelBuilder) queryIs(query *Query, sql string) bool {
+	return query.GetSQL(builder.QuerySet) == sql
+}
+
+func (builder *ModelBuilder) trxEnds(query *Query, startsWithBegin bool) bool {
+	return (startsWithBegin && builder.queryIs(query, "COMMIT")) ||
+		(!startsWithBegin && builder.queryIs(query, "BEGIN"))
+}
+
+// moveToNextQuery returns true if the pointers are successfully moved to the next query, and false it reaches the end of the queries.
+func (builder *ModelBuilder) moveToNextQuery(queryIndex *int, startsWithBegin *bool) bool {
+	query := builder.Queries[*queryIndex]
+	if builder.queryIs(query, "COMMIT") {
+		(*queryIndex)++
+		if *queryIndex >= len(builder.Queries) {
+			return false
+		}
+		*startsWithBegin = builder.queryIs(builder.Queries[*queryIndex], "BEGIN")
+		if *startsWithBegin {
+			(*queryIndex)++
+		}
+	} else {
+		*startsWithBegin = true
+		(*queryIndex)++
+	}
+	return true
+}
+
+// If clusterSingle is ture, all consecutive single query transactions will be viewed as one single transaction.
+func (builder *ModelBuilder) splitTransactions(clusterSingle bool) {
+	currentTrx := []*Query{}
+	startsWithBegin := builder.queryIs(builder.Queries[0], "BEGIN")
+	queryIndex := 0
+	if startsWithBegin {
+		queryIndex++
+	}
+	for queryIndex < len(builder.Queries) {
+		query := builder.Queries[queryIndex]
+		if builder.trxEnds(query, startsWithBegin) {
+			if len(currentTrx) > 0 && (startsWithBegin || clusterSingle) {
+				builder.Transactions = append(builder.Transactions, currentTrx)
+			}
+			currentTrx = make([]*Query, 0)
+			if !builder.moveToNextQuery(&queryIndex, &startsWithBegin) {
+				break
+			}
+		} else {
+			currentTrx = append(currentTrx, query)
+			queryIndex++
+		}
+	}
+	if len(currentTrx) > 0 {
+		builder.Transactions = append(builder.Transactions, currentTrx)
+	}
+}
+
+func (builder *ModelBuilder) trxToString(trx []*Query) string {
+	idStrings := make([]string, len(trx))
+	for i, query := range trx {
+		idStrings[i] = string(query.QueryID)
+	}
+	return strings.Join(idStrings, ",")
+}
+
+func (builder *ModelBuilder) clusterTransactions() {
+	clusters := make(map[string][][]*Query)
+	for _, trx := range builder.Transactions {
+		trxID := builder.trxToString(trx)
+		clusters[trxID] = append(clusters[trxID], trx)
+	}
+	builder.Clusters = make([][][]*Query, len(clusters))
+	index := 0
+	for _, cluster := range clusters {
+		builder.Clusters[index] = cluster
+		index++
 	}
 }
 
@@ -470,21 +555,26 @@ func (builder *ModelBuilder) UpdateGraphModel(lastNQueries []*Query, query *Quer
 	}
 	for _, prediction := range matches {
 		prediction.Hit()
+		if prediction.HitCount > 1 {
+			spew.Dump(*prediction)
+		}
 	}
 	builder.Current = query
 	builder.QueryQueue.MoveToNextQuery(query.QueryID)
 }
 
 // TrainModel trains the model using the given number of queries.
-func (builder *ModelBuilder) TrainModel(gm *GraphModel, numForTraining int) {
-	spinner := sp.NewSpinnerWithProgress(19, "Updating model with query %d...", -1)
-	spinner.Start()
-	for i, query := range builder.Queries[:numForTraining] {
-		spinner.UpdateProgress(i)
-		lastNQueries := builder.Queries[nonNegative(i-LookBackLen):i]
+func (builder *ModelBuilder) TrainModel(gm *GraphModel, queries []*Query) {
+	for i, query := range queries {
+		lastNQueries := queries[nonNegative(i-LookBackLen):i]
 		builder.enumerateConstOperand(query)
 		builder.UpdateGraphModel(lastNQueries, query, gm)
 		builder.enumerateAllOperands(query)
 	}
-	spinner.Stop()
+	builder.QueryQueue = NewQueryQueue()
+	builder.Current = nil
+	builder.NumOpsAllQueries = [][]Operand{}
+	builder.StrOpsAllQueries = [][]Operand{}
+	builder.NumListOpsAllQueries = [][]Operand{}
+	builder.StrListOpsAllQueries = [][]Operand{}
 }
