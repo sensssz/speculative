@@ -4,6 +4,9 @@
 *.so
 *.dylib
 
+# Ignore Mac DS_Store files
+.DS_Store
+
 # Test binary, build with `go test -c`
 *.test
 
