@@ -9,7 +9,6 @@ import (
 
 	"log"
 
-	"github.com/davecgh/go-spew/spew"
 	sp "github.com/sensssz/spinner"
 )
 
@@ -548,6 +547,7 @@ func (builder *ModelBuilder) UpdateGraphModel(lastNQueries []*Query, query *Quer
 	edge := gm.GetEdgeList(builder.Current.QueryID).GetEdge(query.QueryID)
 	edge.IncWeight()
 	path := builder.QueryQueue.GenPath()
+	builder.Current = query
 	matches := edge.FindMatchingPredictions(query, lastNQueries, path)
 	if len(matches) == 0 {
 		matches = builder.enumeratePredictionsForCurrentQuery(lastNQueries)
@@ -555,11 +555,7 @@ func (builder *ModelBuilder) UpdateGraphModel(lastNQueries []*Query, query *Quer
 	}
 	for _, prediction := range matches {
 		prediction.Hit()
-		if prediction.HitCount > 1 {
-			spew.Dump(*prediction)
-		}
 	}
-	builder.Current = query
 	builder.QueryQueue.MoveToNextQuery(query.QueryID)
 }
 

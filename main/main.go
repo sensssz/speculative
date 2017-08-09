@@ -56,6 +56,7 @@ func main() {
 		spinner.UpdateProgress(i)
 		thirtyPercent := int(float64(len(cluster)) * 0.3)
 		for _, trx := range cluster[thirtyPercent:] {
+			total += int64(len(trx))
 			predictor := gm.NewPredictor(modelBuilder.QuerySet)
 			for _, query := range trx {
 				prediction := predictor.PredictNextQuery()
