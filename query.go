@@ -84,7 +84,7 @@ func (querySet *QuerySet) GetQueryID(template string) int {
 		return val
 	}
 
-	queryID := len(querySet.IDToTemplate)
+	queryID := len(querySet.IDToTemplate) + 1
 	querySet.IDToTemplate[queryID] = template
 	querySet.TemplateToID[template] = queryID
 	return queryID
@@ -175,6 +175,9 @@ func (queryParser *QueryParser) ParseQuery(text string) *Query {
 		panic(err)
 	}
 	sql := queryJSON["sql"].(string)
+	if sql == "BEGIN" || sql == "COMMIT" {
+		return nil
+	}
 	resLen := 0
 	resultAsSlice, success := queryJSON["results"].([]interface{})
 	if success {

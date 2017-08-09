@@ -65,9 +65,11 @@ func queriesToString(queries []*Query) string {
 
 // Operand represents an operand involved in an operation.
 type Operand interface {
+	SetQueryIndex(queryIndex int)
 	GetValue(trx []*Query) interface{}
 	ToString() string
 	Equal(operand Operand) bool
+	Copy() Operand
 }
 
 // ConstOperand represents a constant value.
@@ -75,23 +77,31 @@ type ConstOperand struct {
 	Value interface{}
 }
 
+// SetQueryIndex sets the query index for the operand.
+func (op *ConstOperand) SetQueryIndex(queryIndex int) {}
+
 // GetValue returns the constant value.
-func (op ConstOperand) GetValue(trx []*Query) interface{} {
+func (op *ConstOperand) GetValue(trx []*Query) interface{} {
 	return op.Value
 }
 
 // ToString returns a string representation of this operand.
-func (op ConstOperand) ToString() string {
+func (op *ConstOperand) ToString() string {
 	return fmt.Sprintf("%v", op.Value)
 }
 
 // Equal returns whether the two operands are equal.
-func (op ConstOperand) Equal(operand Operand) bool {
-	operandActual, ok := operand.(ConstOperand)
+func (op *ConstOperand) Equal(operand Operand) bool {
+	operandActual, ok := operand.(*ConstOperand)
 	if !ok {
 		return false
 	}
-	return op == operandActual
+	return *op == *operandActual
+}
+
+// Copy returns a copy of the operand.
+func (op *ConstOperand) Copy() Operand {
+	return &ConstOperand{op.Value}
 }
 
 // QueryResultOperand results an operand whose value comes
@@ -103,8 +113,13 @@ type QueryResultOperand struct {
 	ColumnIndex int
 }
 
+// SetQueryIndex sets the query index for the operand.
+func (op *QueryResultOperand) SetQueryIndex(queryIndex int) {
+	op.QueryIndex = queryIndex
+}
+
 // GetValue returns the value represented by this operand.
-func (op QueryResultOperand) GetValue(trx []*Query) interface{} {
+func (op *QueryResultOperand) GetValue(trx []*Query) interface{} {
 	if len(trx) <= op.QueryIndex {
 		fmt.Printf("%+v, %+v\n", op, queriesToString(trx))
 	}
@@ -120,17 +135,24 @@ func (op QueryResultOperand) GetValue(trx []*Query) interface{} {
 }
 
 // ToString returns a string representation of this operand.
-func (op QueryResultOperand) ToString() string {
+func (op *QueryResultOperand) ToString() string {
 	return fmt.Sprintf("Query%d[%d,%d]", op.QueryIndex, op.RowIndex, op.ColumnIndex)
 }
 
 // Equal returns whether the two operands are equal.
-func (op QueryResultOperand) Equal(operand Operand) bool {
-	operandActual, ok := operand.(QueryResultOperand)
+func (op *QueryResultOperand) Equal(operand Operand) bool {
+	operandActual, ok := operand.(*QueryResultOperand)
 	if !ok {
 		return false
 	}
-	return op == operandActual
+	return *op == *operandActual
+}
+
+// Copy returns a copy of the operand.
+func (op *QueryResultOperand) Copy() Operand {
+	var operand QueryResultOperand
+	operand = *op
+	return &operand
 }
 
 // QueryArgumentOperand represents an operand whose value comes
@@ -141,8 +163,13 @@ type QueryArgumentOperand struct {
 	ArgIndex   int
 }
 
+// SetQueryIndex sets the query index for the operand.
+func (op *QueryArgumentOperand) SetQueryIndex(queryIndex int) {
+	op.QueryIndex = queryIndex
+}
+
 // GetValue returns the value represented by this operand.
-func (op QueryArgumentOperand) GetValue(trx []*Query) interface{} {
+func (op *QueryArgumentOperand) GetValue(trx []*Query) interface{} {
 	if len(trx) <= op.QueryIndex {
 		fmt.Printf("%+v, %+v\n", op, queriesToString(trx))
 	}
@@ -155,17 +182,24 @@ func (op QueryArgumentOperand) GetValue(trx []*Query) interface{} {
 }
 
 // ToString returns a string representation of this operand.
-func (op QueryArgumentOperand) ToString() string {
+func (op *QueryArgumentOperand) ToString() string {
 	return fmt.Sprintf("Query%d(%d)", op.QueryIndex, op.ArgIndex)
 }
 
 // Equal returns whether the two operands are equal.
-func (op QueryArgumentOperand) Equal(operand Operand) bool {
-	operandActual, ok := operand.(QueryArgumentOperand)
+func (op *QueryArgumentOperand) Equal(operand Operand) bool {
+	operandActual, ok := operand.(*QueryArgumentOperand)
 	if !ok {
 		return false
 	}
-	return op == operandActual
+	return *op == *operandActual
+}
+
+// Copy returns a copy of the operand.
+func (op *QueryArgumentOperand) Copy() Operand {
+	var operand QueryArgumentOperand
+	operand = *op
+	return &operand
 }
 
 // Aggregator represents aggregation functions on float slice
@@ -179,8 +213,13 @@ type AggregationOperand struct {
 	ColumnIndex int
 }
 
+// SetQueryIndex sets the query index for the operand.
+func (op *AggregationOperand) SetQueryIndex(queryIndex int) {
+	op.QueryIndex = queryIndex
+}
+
 // GetValue returns the value represented by this operand.
-func (op AggregationOperand) GetValue(trx []*Query) interface{} {
+func (op *AggregationOperand) GetValue(trx []*Query) interface{} {
 	queryResult := trx[op.QueryIndex].ResultSet
 	column := make([]float64, 0, len(queryResult))
 	for _, row := range queryResult {
@@ -196,18 +235,25 @@ func (op AggregationOperand) GetValue(trx []*Query) interface{} {
 }
 
 // ToString returns a string representation of this operand.
-func (op AggregationOperand) ToString() string {
+func (op *AggregationOperand) ToString() string {
 	return fmt.Sprintf("Query%d.aggregate(%d)", op.QueryIndex, op.ColumnIndex)
 }
 
 // Equal returns whether the two operands are equal.
-func (op AggregationOperand) Equal(operand Operand) bool {
-	operandActual, ok := operand.(AggregationOperand)
+func (op *AggregationOperand) Equal(operand Operand) bool {
+	operandActual, ok := operand.(*AggregationOperand)
 	if !ok {
 		return false
 	}
 	return op.QueryIndex == operandActual.QueryIndex &&
 		op.ColumnIndex == operandActual.ColumnIndex
+}
+
+// Copy returns a copy of the operand.
+func (op *AggregationOperand) Copy() Operand {
+	var operand AggregationOperand
+	operand = *op
+	return &operand
 }
 
 // ArgumentListOperand represents an operand whose value is a list
@@ -218,8 +264,13 @@ type ArgumentListOperand struct {
 	ArgIndex   int
 }
 
+// SetQueryIndex sets the query index for the operand.
+func (op *ArgumentListOperand) SetQueryIndex(queryIndex int) {
+	op.QueryIndex = queryIndex
+}
+
 // GetValue returns the value represented by this operand.
-func (op ArgumentListOperand) GetValue(trx []*Query) interface{} {
+func (op *ArgumentListOperand) GetValue(trx []*Query) interface{} {
 	if len(trx) <= op.QueryIndex {
 		fmt.Printf("%+v, %+v\n", op, queriesToString(trx))
 	}
@@ -232,17 +283,24 @@ func (op ArgumentListOperand) GetValue(trx []*Query) interface{} {
 }
 
 // ToString returns a string representation of this operand.
-func (op ArgumentListOperand) ToString() string {
+func (op *ArgumentListOperand) ToString() string {
 	return fmt.Sprintf("Query%d(%dl)", op.QueryIndex, op.ArgIndex)
 }
 
 // Equal returns whether the two operands are equal.
-func (op ArgumentListOperand) Equal(operand Operand) bool {
-	operandActual, ok := operand.(ArgumentListOperand)
+func (op *ArgumentListOperand) Equal(operand Operand) bool {
+	operandActual, ok := operand.(*ArgumentListOperand)
 	if !ok {
 		return false
 	}
-	return op == operandActual
+	return *op == *operandActual
+}
+
+// Copy returns a copy of the operand.
+func (op *ArgumentListOperand) Copy() Operand {
+	var operand ArgumentListOperand
+	operand = *op
+	return &operand
 }
 
 // ColumnListOperand represents an operand whose value is a list,
@@ -253,8 +311,13 @@ type ColumnListOperand struct {
 	ColumnIndex int
 }
 
+// SetQueryIndex sets the query index for the operand.
+func (op *ColumnListOperand) SetQueryIndex(queryIndex int) {
+	op.QueryIndex = queryIndex
+}
+
 // GetValue returns the value represented by this operand.
-func (op ColumnListOperand) GetValue(trx []*Query) interface{} {
+func (op *ColumnListOperand) GetValue(trx []*Query) interface{} {
 	if len(trx) <= op.QueryIndex {
 		fmt.Printf("%+v, %+v\n", op, queriesToString(trx))
 	}
@@ -277,17 +340,24 @@ func (op ColumnListOperand) GetValue(trx []*Query) interface{} {
 }
 
 // ToString returns a string representation of this operand.
-func (op ColumnListOperand) ToString() string {
+func (op *ColumnListOperand) ToString() string {
 	return fmt.Sprintf("Query%d[%dl]", op.QueryIndex, op.ColumnIndex)
 }
 
 // Equal returns whether the two operands are equal.
-func (op ColumnListOperand) Equal(operand Operand) bool {
-	operandActual, ok := operand.(ColumnListOperand)
+func (op *ColumnListOperand) Equal(operand Operand) bool {
+	operandActual, ok := operand.(*ColumnListOperand)
 	if !ok {
 		return false
 	}
-	return op == operandActual
+	return *op == *operandActual
+}
+
+// Copy returns a copy of the operand.
+func (op *ColumnListOperand) Copy() Operand {
+	var operand ColumnListOperand
+	operand = *op
+	return &operand
 }
 
 // Operation represents an operation involving zero, one or more operands.
