@@ -39,29 +39,11 @@ type Prediction struct {
 	QueryID  int
 	ParamOps []Operation
 	HitCount int
-	IsRandom bool
 }
 
 // NewPrediction creates a new Prediction object.
 func NewPrediction(queryID int, parameters []Operation) *Prediction {
-	prediction := Prediction{queryID, parameters, 0, false}
-	for _, param := range parameters {
-		switch param.(type) {
-		case RandomOperation:
-			prediction.IsRandom = true
-			break
-		}
-	}
-	return &prediction
-}
-
-// NewRandomPrediction creates a random prediction
-func NewRandomPrediction(queryID int, numOps int) *Prediction {
-	ops := make([]Operation, numOps)
-	for i := 0; i < numOps; i++ {
-		ops[i] = RandomOperation{}
-	}
-	return &Prediction{queryID, ops, 0, true}
+	return &Prediction{queryID, parameters, 0}
 }
 
 // Hit increases the HitCount of this prediction.
@@ -73,9 +55,6 @@ func (prediction *Prediction) Hit() {
 func (prediction *Prediction) MatchesQuery(trx []*Query, query *Query) bool {
 	if prediction.QueryID != query.QueryID {
 		return false
-	}
-	if prediction.IsRandom {
-		return true
 	}
 	for i := 0; i < len(query.Arguments); i++ {
 		if !prediction.ParamOps[i].MatchesValue(trx, query.Arguments[i]) {
@@ -97,21 +76,12 @@ func NewPredictionTrees() *PredictionTrees {
 
 // Predictor does prediction using the prediction trees.
 type Predictor struct {
-	pt          *PredictionTrees
-	newTrx      bool
-	currentNode *Node
-	currentTrx  []*Query
+	gm          *GraphModel
+	current     int
+	queries     []*Query
+	queryQueue  *QueryQueue
 	queryParser *QueryParser
 	manager     QueryManager
-}
-
-// PrintCurrentTree prints out the tree in a pretty format.
-func (pt *Predictor) PrintCurrentTree() {
-	node := pt.currentNode
-	for node.Parent != nil {
-		node = node.Parent
-	}
-	fmt.Println(node.ToString())
 }
 
 // PredictNextSQL returns the most possible next query in SQL form.
@@ -125,138 +95,96 @@ func (pt *Predictor) PredictNextSQL() string {
 
 // PredictNextQuery returns the most possible next query.
 func (pt *Predictor) PredictNextQuery() *Query {
-	if pt.currentNode == nil ||
-		len(pt.currentNode.Children) == 0 {
-		pt.currentNode = nil
+	if len(pt.queries) == 0 {
 		return nil
 	}
-	queryFrequencies := make(map[int]int)
-	mostFrequentQuery := -1
-	for _, child := range pt.currentNode.Children {
-		queryID := child.Payload.(*Prediction).QueryID
-		queryFrequencies[queryID]++
-		if queryFrequencies[queryID] > queryFrequencies[mostFrequentQuery] {
-			mostFrequentQuery = queryID
-		}
-	}
-	if !strings.HasPrefix(pt.manager.GetTemplate(mostFrequentQuery), "SELECT") {
+	path := pt.queryQueue.GenPath()
+	bestMatch := pt.gm.GetEdgeList(pt.current).FindBestPrediction(path)
+	if bestMatch == nil {
 		return nil
 	}
-	var maxHitChild *Node
-	maxHitChild = nil
-	for _, child := range pt.currentNode.Children {
-		if !child.Payload.(*Prediction).IsRandom &&
-			(maxHitChild == nil ||
-				maxHitChild.Payload.(*Prediction).QueryID != mostFrequentQuery ||
-				maxHitChild.Payload.(*Prediction).HitCount < child.Payload.(*Prediction).HitCount) {
-			maxHitChild = child
-		}
+	arguments := make([]interface{}, len(bestMatch.ParamOps))
+	for i, paramOp := range bestMatch.ParamOps {
+		arguments[i] = paramOp.GetValue(pt.queries)
 	}
-	if maxHitChild == nil {
-		maxHitChild = pt.currentNode.Children[0]
-		for _, child := range pt.currentNode.Children {
-			if maxHitChild.Payload.(*Prediction).QueryID != mostFrequentQuery ||
-				maxHitChild.Payload.(*Prediction).HitCount < child.Payload.(*Prediction).HitCount {
-				maxHitChild = child
-			}
-		}
-	}
-	prediction := maxHitChild.Payload.(*Prediction)
-	if prediction.IsRandom {
-		return nil
-	}
-	arguments := make([]interface{}, len(prediction.ParamOps))
-	for i, paramOp := range prediction.ParamOps {
-		arguments[i] = paramOp.GetValue(pt.currentTrx)
-	}
-	return &Query{prediction.QueryID, [][]interface{}{}, arguments, true}
+	return &Query{bestMatch.QueryID, [][]interface{}{}, arguments, true}
 }
 
 // MoveToNext query.
 func (pt *Predictor) MoveToNext(query *Query) {
-	sql := query.GetSQL(pt.manager)
-	if sql == "BEGIN" || sql == "COMMIT" {
-		pt.currentTrx = []*Query{}
-		pt.currentNode = nil
-		pt.newTrx = true
+	pt.current = query.QueryID
+	pt.queries = append(pt.queries, query)
+	if len(pt.queries) > LookBackLen {
+		pt.queries = pt.queries[1:]
 	}
-	if pt.currentNode == nil && pt.newTrx {
-		pt.newTrx = false
-		pt.currentTrx = append(pt.currentTrx, query)
-		pt.currentNode = pt.pt.GetTreeWithRoot(query.QueryID, len(query.Arguments))
-		return
-	}
-	if pt.currentNode == nil {
-		return
-	}
-	pt.currentTrx = append(pt.currentTrx, query)
-	children := pt.currentNode.Children
-	pt.currentNode = nil
-	for _, child := range children {
-		prediction := child.Payload.(*Prediction)
-		if !prediction.MatchesQuery(pt.currentTrx, query) {
-			continue
-		}
-		if pt.currentNode == nil ||
-			prediction.HitCount > pt.currentNode.Payload.(*Prediction).HitCount {
-			pt.currentNode = child
-		}
-	}
+	pt.queryQueue.MoveToNextQuery(query.QueryID)
 }
 
-// PrintCurrntTrx prints the query templates of the current transaction.
-func (pt *Predictor) PrintCurrntTrx() {
-	for _, query := range pt.currentTrx {
-		fmt.Printf("%d, %s\n", query.QueryID, pt.manager.GetTemplate(query.QueryID))
-	}
+// GraphModel is a graph-based model for prediction.
+type GraphModel struct {
+	vertexEdges map[int]*EdgeList
 }
 
-// EndTransaction ends the current transaction
-func (pt *Predictor) EndTransaction() {
-	pt.currentNode = nil
-	pt.newTrx = true
-	pt.currentTrx = []*Query{}
+// NewGraphModel creates a new GraphModel.
+func NewGraphModel() *GraphModel {
+	return &GraphModel{make(map[int]*EdgeList)}
+}
+
+// GetEdgeList returns the EdgeList for this query.
+func (gm *GraphModel) GetEdgeList(queryID int) *EdgeList {
+	edgeList := gm.vertexEdges[queryID]
+	if edgeList == nil {
+		edgeList = NewEdgeList()
+		gm.vertexEdges[queryID] = edgeList
+	}
+	return edgeList
+}
+
+// Print this model.
+func (gm *GraphModel) Print() {
+	fmt.Fprintf(os.Stderr, "Graph Model:\n")
+	for queryID, edgeList := range gm.vertexEdges {
+		fmt.Fprintf(os.Stderr, "%v:[\n", queryID)
+		for toQuery, edge := range edgeList.Edges {
+			fmt.Fprintf(os.Stderr, "  %v: {\n", toQuery)
+			for path, predictions := range edge.Predictions {
+				fmt.Fprintf(os.Stderr, "    %v: [%v]\n", path, len(predictions))
+			}
+			fmt.Fprintf(os.Stderr, "  },\n")
+		}
+		fmt.Fprintf(os.Stderr, "],\n")
+	}
 }
 
 // NewPredictor creates predictor using the this prediction tree
-func (pt *PredictionTrees) NewPredictor(manager QueryManager) *Predictor {
-	return &Predictor{pt, true, nil, []*Query{}, NewQueryParser(manager), manager}
-}
-
-// GetTreeWithRoot returns the tree with the given query as root
-func (pt *PredictionTrees) GetTreeWithRoot(queryID int, numOps int) *Node {
-	tree := pt.trees[queryID]
-	if tree == nil {
-		tree = NewNode(NewRandomPrediction(queryID, numOps), nil)
-		pt.trees[queryID] = tree
-	}
-	return tree
+func (gm *GraphModel) NewPredictor(manager QueryManager) *Predictor {
+	return &Predictor{gm, 0, []*Query{}, NewQueryQueue(), NewQueryParser(manager), manager}
 }
 
 // ModelBuilder takes in a workload trace and generates a prediciton
 // model from it.
 type ModelBuilder struct {
-	QuerySet     *QuerySet
-	Queries      []*Query
-	Transactions [][]*Query
-	Clusters     [][][]*Query
+	QuerySet             *QuerySet
+	Queries              []*Query
+	QueryQueue           *QueryQueue
+	Current              *Query
+	NumOpsAllQueries     [][]Operand
+	StrOpsAllQueries     [][]Operand
+	NumListOpsAllQueries [][]Operand
+	StrListOpsAllQueries [][]Operand
 }
 
 // NewModelBuilder creates a new ModelBuilder
 func NewModelBuilder(path string) *ModelBuilder {
-	builder := &ModelBuilder{NewQuerySet(), []*Query{}, [][]*Query{}, [][][]*Query{}}
+	builder := &ModelBuilder{NewQuerySet(), []*Query{}, NewQueryQueue(), nil, [][]Operand{}, [][]Operand{}, [][]Operand{}, [][]Operand{}}
 	builder.parseQueriesFromFile(path)
-	builder.splitTransactions(true)
-	builder.clusterTransactions()
 	return builder
 }
 
 // NewModelBuilderFromContent creates a new ModelBuilder using the given queries
 func NewModelBuilderFromContent(queries string) *ModelBuilder {
-	builder := &ModelBuilder{NewQuerySet(), []*Query{}, [][]*Query{}, [][][]*Query{}}
+	builder := &ModelBuilder{NewQuerySet(), []*Query{}, NewQueryQueue(), nil, [][]Operand{}, [][]Operand{}, [][]Operand{}, [][]Operand{}}
 	builder.parseQueries(queries)
-	builder.splitTransactions(true)
-	builder.clusterTransactions()
 	return builder
 }
 
@@ -269,7 +197,6 @@ func (builder *ModelBuilder) parseQueriesFromFile(path string) {
 		queryParser := NewQueryParser(builder.QuerySet)
 
 		spinner := sp.NewSpinnerWithProgress(19, "Parsing query %d...", -1)
-		//adjust the capacity to your need (max characters in line)
 		const maxCapacity = 1024 * 1024 * 1024
 		buf := make([]byte, maxCapacity)
 		scanner.Buffer(buf, maxCapacity)
@@ -283,7 +210,10 @@ func (builder *ModelBuilder) parseQueriesFromFile(path string) {
 			if len(line) <= 1 {
 				continue
 			}
-			builder.Queries = append(builder.Queries, queryParser.ParseQuery(line))
+			query := queryParser.ParseQuery(line)
+			if query != nil {
+				builder.Queries = append(builder.Queries, query)
+			}
 		}
 		spinner.Stop()
 	} else {
@@ -295,120 +225,50 @@ func (builder *ModelBuilder) parseQueries(queries string) {
 	queryParser := NewQueryParser(builder.QuerySet)
 	lines := strings.Split(queries, "\n")
 	for _, line := range lines {
-		builder.Queries = append(builder.Queries, queryParser.ParseQuery(line))
-	}
-}
-
-func (builder *ModelBuilder) queryIs(query *Query, sql string) bool {
-	return query.GetSQL(builder.QuerySet) == sql
-}
-
-func (builder *ModelBuilder) trxEnds(query *Query, startsWithBegin bool) bool {
-	return (startsWithBegin && builder.queryIs(query, "COMMIT")) ||
-		(!startsWithBegin && builder.queryIs(query, "BEGIN"))
-}
-
-// moveToNextQuery returns true if the pointers are successfully moved to the next query, and false it reaches the end of the queries.
-func (builder *ModelBuilder) moveToNextQuery(queryIndex *int, startsWithBegin *bool) bool {
-	query := builder.Queries[*queryIndex]
-	if builder.queryIs(query, "COMMIT") {
-		(*queryIndex)++
-		if *queryIndex >= len(builder.Queries) {
-			return false
-		}
-		*startsWithBegin = builder.queryIs(builder.Queries[*queryIndex], "BEGIN")
-		if *startsWithBegin {
-			(*queryIndex)++
-		}
-	} else {
-		*startsWithBegin = true
-		(*queryIndex)++
-	}
-	return true
-}
-
-// If clusterSingle is ture, all consecutive single query transactions will be viewed as one single transaction.
-func (builder *ModelBuilder) splitTransactions(clusterSingle bool) {
-	currentTrx := []*Query{}
-	startsWithBegin := builder.queryIs(builder.Queries[0], "BEGIN")
-	queryIndex := 0
-	if startsWithBegin {
-		queryIndex++
-	}
-	for queryIndex < len(builder.Queries) {
-		query := builder.Queries[queryIndex]
-		if builder.trxEnds(query, startsWithBegin) {
-			if len(currentTrx) > 0 && (startsWithBegin || clusterSingle) {
-				builder.Transactions = append(builder.Transactions, currentTrx)
-			}
-			currentTrx = make([]*Query, 0)
-			if !builder.moveToNextQuery(&queryIndex, &startsWithBegin) {
-				break
-			}
-		} else {
-			currentTrx = append(currentTrx, query)
-			queryIndex++
+		query := queryParser.ParseQuery(line)
+		if query != nil {
+			builder.Queries = append(builder.Queries, query)
 		}
 	}
-	if len(currentTrx) > 0 {
-		builder.Transactions = append(builder.Transactions, currentTrx)
-	}
 }
 
-func (builder *ModelBuilder) trxToString(trx []*Query) string {
-	idStrings := make([]string, len(trx))
-	for i, query := range trx {
-		idStrings[i] = string(query.QueryID)
-	}
-	return strings.Join(idStrings, ",")
-}
-
-func (builder *ModelBuilder) clusterTransactions() {
-	clusters := make(map[string][][]*Query)
-	for _, trx := range builder.Transactions {
-		trxID := builder.trxToString(trx)
-		clusters[trxID] = append(clusters[trxID], trx)
-	}
-	builder.Clusters = make([][][]*Query, len(clusters))
-	index := 0
-	for _, cluster := range clusters {
-		builder.Clusters[index] = cluster
-		index++
-	}
-}
-
-func (builder *ModelBuilder) enumerateConstOperand(query *Query, numOpsAllQueries *[][]Operand, strOpsAllQueries *[][]Operand) {
+func (builder *ModelBuilder) enumerateConstOperand(query *Query) {
 	numOps := make([]Operand, 0, len(query.Arguments))
 	strOps := make([]Operand, 0, len(query.Arguments))
 	for _, arg := range query.Arguments {
 		op := ConstOperand{arg}
 		switch arg.(type) {
 		case string:
-			strOps = append(strOps, op)
+			strOps = append(strOps, &op)
 		case float64:
-			numOps = append(numOps, op)
+			numOps = append(numOps, &op)
 		}
 	}
-	*numOpsAllQueries = append(*numOpsAllQueries, numOps)
-	*strOpsAllQueries = append(*strOpsAllQueries, strOps)
+	builder.NumOpsAllQueries = append(builder.NumOpsAllQueries, numOps)
+	builder.StrOpsAllQueries = append(builder.StrOpsAllQueries, strOps)
+	if len(builder.NumOpsAllQueries) != len(builder.StrOpsAllQueries) ||
+		len(builder.NumOpsAllQueries) != len(builder.NumListOpsAllQueries)+1 ||
+		len(builder.StrOpsAllQueries) != len(builder.StrListOpsAllQueries)+1 {
+		panic(fmt.Sprintf("%v, %v, %v, %v", len(builder.NumOpsAllQueries), len(builder.StrOpsAllQueries), len(builder.NumListOpsAllQueries), len(builder.StrListOpsAllQueries)))
+	}
 }
 
-func (builder *ModelBuilder) enumerateResultOperand(queryIndex int, query *Query, numOps *[]Operand, strOps *[]Operand) {
+func (builder *ModelBuilder) enumerateResultOperand(query *Query, numOps *[]Operand, strOps *[]Operand) {
 	if len(query.ResultSet) != 1 {
 		return
 	}
 	for j, cell := range query.ResultSet[0] {
-		op := QueryResultOperand{query.QueryID, queryIndex, 0, j}
+		op := QueryResultOperand{query.QueryID, 0, 0, j}
 		switch cell.(type) {
 		case string:
-			*strOps = append(*strOps, op)
+			*strOps = append(*strOps, &op)
 		case float64:
-			*numOps = append(*numOps, op)
+			*numOps = append(*numOps, &op)
 		}
 	}
 }
 
-func (builder *ModelBuilder) enumerateAggregationOperand(queryIndex int, query *Query, numOps *[]Operand, aggregators []Aggregator) {
+func (builder *ModelBuilder) enumerateAggregationOperand(query *Query, numOps *[]Operand, aggregators []Aggregator) {
 	if len(query.ResultSet) == 0 {
 		return
 	}
@@ -420,36 +280,36 @@ func (builder *ModelBuilder) enumerateAggregationOperand(queryIndex int, query *
 			continue
 		}
 		for _, aggregator := range aggregators {
-			aggregation := AggregationOperand{queryIndex, aggregator, i}
-			*numOps = append(*numOps, aggregation)
+			aggregation := AggregationOperand{0, aggregator, i}
+			*numOps = append(*numOps, &aggregation)
 		}
 	}
 }
 
-func (builder *ModelBuilder) enumerateArgumentOperand(queryIndex int, query *Query, numOps *[]Operand, strOps *[]Operand) {
+func (builder *ModelBuilder) enumerateArgumentOperand(query *Query, numOps *[]Operand, strOps *[]Operand) {
 	for i, arg := range query.Arguments {
-		op := QueryArgumentOperand{query.QueryID, queryIndex, i}
+		op := QueryArgumentOperand{query.QueryID, 0, i}
 		switch arg.(type) {
 		case string:
-			*strOps = append(*strOps, op)
+			*strOps = append(*strOps, &op)
 		case float64:
-			*numOps = append(*numOps, op)
+			*numOps = append(*numOps, &op)
 		}
 	}
 }
 
-func (builder *ModelBuilder) enumerateArgumentListOperand(queryIndex int, query *Query, numLists *[]Operand, strLists *[]Operand) {
+func (builder *ModelBuilder) enumerateArgumentListOperand(query *Query, numLists *[]Operand, strLists *[]Operand) {
 	for i, arg := range query.Arguments {
 		if set, ok := arg.(*UnorderedSet); ok {
 			if set.Size() == 0 {
 				continue
 			}
-			op := ArgumentListOperand{query.QueryID, queryIndex, i}
+			op := ArgumentListOperand{query.QueryID, 0, i}
 			switch set.Elements()[0].(type) {
 			case string:
-				*strLists = append(*strLists, op)
+				*strLists = append(*strLists, &op)
 			case float64:
-				*numLists = append(*numLists, op)
+				*numLists = append(*numLists, &op)
 			}
 		}
 	}
@@ -466,57 +326,68 @@ func (builder *ModelBuilder) getColumnType(query *Query, columnIndex int) reflec
 	return kind
 }
 
-func (builder *ModelBuilder) enumerateColumnListOperand(queryIndex int, query *Query, numLists *[]Operand, strLists *[]Operand) {
+func (builder *ModelBuilder) enumerateColumnListOperand(query *Query, numLists *[]Operand, strLists *[]Operand) {
 	if len(query.ResultSet) == 0 {
 		return
 	}
 	firstRow := query.ResultSet[0]
 	for i := 0; i < len(firstRow); i++ {
 		kind := builder.getColumnType(query, i)
-		op := ColumnListOperand{query.QueryID, queryIndex, i}
+		op := ColumnListOperand{query.QueryID, 0, i}
 		switch kind {
 		case reflect.String:
-			*strLists = append(*strLists, op)
+			*strLists = append(*strLists, &op)
 		case reflect.Float64:
-			*numLists = append(*numLists, op)
+			*numLists = append(*numLists, &op)
 		}
 	}
 }
 
-func (builder *ModelBuilder) enumerateAllOperands(queryIndex int, query *Query, numOpsAllQueries *[][]Operand, strOpsAllQueries *[][]Operand, numListOpsAllQueries *[][]Operand, strListOpsAllQueries *[][]Operand) {
+func (builder *ModelBuilder) enumerateAllOperands(query *Query) {
 	numOps := []Operand{}
 	strOps := []Operand{}
 	numListOps := []Operand{}
 	strListOps := []Operand{}
 
-	builder.enumerateResultOperand(queryIndex, query, &numOps, &strOps)
-	builder.enumerateArgumentOperand(queryIndex, query, &numOps, &strOps)
-	// builder.enumerateAggregationOperand(queryIndex, query, Aggregators, &numOps)
-	builder.enumerateArgumentListOperand(queryIndex, query, &numListOps, &strListOps)
-	builder.enumerateColumnListOperand(queryIndex, query, &numListOps, &strListOps)
+	builder.enumerateResultOperand(query, &numOps, &strOps)
+	builder.enumerateArgumentOperand(query, &numOps, &strOps)
+	// builder.enumerateAggregationOperand(query, Aggregators, &numOps)
+	builder.enumerateArgumentListOperand(query, &numListOps, &strListOps)
+	builder.enumerateColumnListOperand(query, &numListOps, &strListOps)
 
 	// For numOps and strOps, the slice for the query at queryIndex has been inserted at enumerateConstOperands
-	(*numOpsAllQueries)[queryIndex] = append((*numOpsAllQueries)[queryIndex], numOps...)
-	(*strOpsAllQueries)[queryIndex] = append((*strOpsAllQueries)[queryIndex], strOps...)
-	*numListOpsAllQueries = append(*numListOpsAllQueries, numListOps)
-	*strListOpsAllQueries = append(*strListOpsAllQueries, strListOps)
+	numQueries := len(builder.NumListOpsAllQueries)
+	builder.NumOpsAllQueries[numQueries] = append(builder.NumOpsAllQueries[numQueries], numOps...)
+	builder.StrOpsAllQueries[numQueries] = append(builder.StrOpsAllQueries[numQueries], numOps...)
+	builder.NumListOpsAllQueries = append(builder.NumListOpsAllQueries, numListOps)
+	builder.StrListOpsAllQueries = append(builder.StrListOpsAllQueries, strListOps)
+	if numQueries == LookBackLen {
+		builder.NumOpsAllQueries = builder.NumOpsAllQueries[1:]
+		builder.StrOpsAllQueries = builder.StrOpsAllQueries[1:]
+		builder.NumListOpsAllQueries = builder.NumListOpsAllQueries[1:]
+		builder.StrListOpsAllQueries = builder.StrListOpsAllQueries[1:]
+	}
+	if len(builder.NumOpsAllQueries) > LookBackLen ||
+		len(builder.StrOpsAllQueries) > LookBackLen ||
+		len(builder.NumListOpsAllQueries) > LookBackLen ||
+		len(builder.StrListOpsAllQueries) > LookBackLen {
+		panic(fmt.Sprintf("%v, %v, %v, %v", len(builder.NumOpsAllQueries), len(builder.StrOpsAllQueries), len(builder.NumListOpsAllQueries), len(builder.StrListOpsAllQueries)))
+	}
 }
 
 // Search for unary operations that matches the columnIndex-th parameter of the queryIndex-th query.
-func (builder *ModelBuilder) searchForUnaryOps(transactions [][]*Query, operands [][]Operand, queryIndex int, columnIndex int) []Operation {
+func (builder *ModelBuilder) searchForUnaryOps(queries []*Query, operands [][]Operand, columnIndex int) []Operation {
 	unaryOperations := make([]Operation, 0, len(operands))
+	if len(operands) > LookBackLen+1 || len(queries) > LookBackLen || !(len(operands) == len(queries)+1 || len(operands) == len(queries)) {
+		panic(fmt.Sprintf("len(operands): %v, len(queries): %v\n", len(operands), len(queries)))
+	}
+	// fmt.Printf("%+v\n", operands)
 	for i := len(operands) - 1; i >= 0; i-- {
 		for j := 0; j < len(operands[i]); j++ {
-			operand := operands[i][j]
-			matches := true
-			for trxIndex := 0; trxIndex < len(transactions); trxIndex++ {
-				targetQuery := transactions[trxIndex][queryIndex]
-				if !valueEqual(operand.GetValue(transactions[trxIndex]), targetQuery.Arguments[columnIndex]) {
-					matches = false
-					break
-				}
-			}
-			if matches {
+			operand := operands[i][j].Copy()
+			operand.SetQueryIndex(i)
+			// fmt.Printf("%d,%d:%+v\n", i, j, operand)
+			if valueEqual(operand.GetValue(queries), builder.Current.Arguments[columnIndex]) {
 				unaryOperations = append(unaryOperations, UnaryOperation{operand})
 			}
 		}
@@ -554,180 +425,66 @@ func (builder *ModelBuilder) operationCombinations(paraOps [][]Operation, queryI
 	}
 }
 
-func (builder *ModelBuilder) collapseArgOperand(parent *Node, parentLevel int, op Operand) Operand {
-	if parent == nil {
-		return op
-	}
-	targetQueryIndex := 0
-	targetArgIndex := 0
-	switch op.(type) {
-	case QueryArgumentOperand:
-		argOp := op.(QueryArgumentOperand)
-		targetQueryIndex = argOp.QueryIndex
-		targetArgIndex = argOp.ArgIndex
-	case ArgumentListOperand:
-		argOp := op.(ArgumentListOperand)
-		targetQueryIndex = argOp.QueryIndex
-		targetArgIndex = argOp.ArgIndex
-	}
-	for parentLevel > targetQueryIndex {
-		parent = parent.Parent
-		parentLevel--
-		if parent == nil {
-			return op
-		}
-	}
-	prediction := parent.Payload.(*Prediction)
-	argOperation := prediction.ParamOps[targetArgIndex]
-	if _, ok := argOperation.(RandomOperation); ok {
-		// Prediction for the target arg is random, not need to collapse.
-		return op
-	}
-	argOperand := argOperation.(UnaryOperation).Operand
-	if _, ok := argOperand.(QueryArgumentOperand); ok {
-		return builder.collapseArgOperand(parent, parentLevel, argOperand)
-	}
-	if _, ok := argOperand.(ArgumentListOperand); ok {
-		return builder.collapseArgOperand(parent, parentLevel, argOperand)
-	}
-	return argOperand
-}
-
-func (builder *ModelBuilder) collapseOperands(parent *Node, parentLevel int, operands [][]Operand) [][]Operand {
-	for i := len(operands) - 1; i >= 0; i-- {
-		ops := operands[i]
-		for i, op := range ops {
-			switch op.(type) {
-			case QueryArgumentOperand:
-				collapsedOp := builder.collapseArgOperand(parent, parentLevel, op)
-				ops[i] = collapsedOp
-			case ArgumentListOperand:
-				collapsedOp := builder.collapseArgOperand(parent, parentLevel, op)
-				ops[i] = collapsedOp
-			}
-		}
-	}
-
-	// Deduplicate ops
-	opExistsence := make(map[Operand]bool)
-	deduplicatedOps := make([][]Operand, len(operands))
-	for i := len(operands) - 1; i >= 0; i-- {
-		ops := operands[i]
-		deduplicated := make([]Operand, 0, len(ops))
-		for _, op := range ops {
-			if !opExistsence[op] {
-				opExistsence[op] = true
-				deduplicated = append(deduplicated, op)
-			}
-		}
-		deduplicatedOps[i] = deduplicated
-	}
-
-	return deduplicatedOps
-}
-
-func (builder *ModelBuilder) enumeratePredictionsForQuery(parent *Node, transactions [][]*Query, queryIndex int, numOps [][]Operand, strOps [][]Operand, numListOps [][]Operand, strListOps [][]Operand) []*Node {
-	query := transactions[0][queryIndex]
-	numOps = builder.collapseOperands(parent, queryIndex-1, numOps)
-	strOps = builder.collapseOperands(parent, queryIndex-1, strOps)
-	numListOps = builder.collapseOperands(parent, queryIndex-1, numListOps)
-	strListOps = builder.collapseOperands(parent, queryIndex-1, strListOps)
+func (builder *ModelBuilder) enumeratePredictionsForCurrentQuery(queries []*Query) []*Prediction {
+	query := builder.Current
 	opsForArgs := make([][]Operation, len(query.Arguments))
 	for i, arg := range query.Arguments {
 		var candidateOps [][]Operand
 		switch arg.(type) {
 		case float64:
-			candidateOps = numOps
+			candidateOps = builder.NumOpsAllQueries
 		case string:
-			candidateOps = strOps
+			candidateOps = builder.StrOpsAllQueries
 		case *UnorderedSet:
 			if len(arg.(*UnorderedSet).Elements()) == 0 {
 				break
 			}
 			switch arg.(*UnorderedSet).Elements()[0].(type) {
 			case float64:
-				candidateOps = numListOps
+				candidateOps = builder.NumListOpsAllQueries
 			case string:
-				candidateOps = strListOps
+				candidateOps = builder.StrListOpsAllQueries
 			}
 		}
-		ops := builder.searchForUnaryOps(transactions, candidateOps, queryIndex, i)
+		ops := builder.searchForUnaryOps(queries, candidateOps, i)
 		opsForArgs[i] = append(opsForArgs[i], ops...)
 	}
 	predictions := builder.enumeratePredictionsFromParaOps(opsForArgs, query.QueryID)
-	if len(predictions) == 0 {
-		predictions = append(predictions, NewRandomPrediction(query.QueryID, len(query.Arguments)))
-	}
-	nodes := make([]*Node, len(predictions))
-	for i, prediction := range predictions {
-		nodes[i] = NewNode(prediction, parent)
-	}
-	return nodes
+	return predictions
 }
 
-// UpdateModel updates the model using the supplied transactions.
-func (builder *ModelBuilder) UpdateModel(transactions [][]*Query, pt *PredictionTrees) {
-	exampleTrx := transactions[0]
-	numTrx := min(10, len(transactions))
-	firstTen := transactions[:numTrx]
-	numOpsAllQueries := [][]Operand{}
-	strOpsAllQueries := [][]Operand{}
-	numListOpsAllQueries := [][]Operand{}
-	strListOpsAllQueries := [][]Operand{}
-	root := pt.GetTreeWithRoot(exampleTrx[0].QueryID, len(exampleTrx[0].Arguments))
-	currentLevel := []*Node{root}
-	nextLevel := []*Node{}
-	builder.enumerateConstOperand(exampleTrx[0], &numOpsAllQueries, &strOpsAllQueries)
-	builder.enumerateAllOperands(0, exampleTrx[0], &numOpsAllQueries, &strOpsAllQueries, &numListOpsAllQueries, &strListOpsAllQueries)
-	for index, query := range exampleTrx[1:] {
-		i := index + 1
-		builder.enumerateConstOperand(query, &numOpsAllQueries, &strOpsAllQueries)
-		for _, node := range currentLevel {
-			predictionsForThisQuery := node.FilterChildren(func(payload interface{}) bool {
-				if prediction, ok := payload.(*Prediction); ok {
-					return prediction.QueryID == query.QueryID
-				}
-				return false
-			})
-			if len(predictionsForThisQuery) == 0 {
-				numOpsLen := len(numOpsAllQueries)
-				strOpsLen := len(strOpsAllQueries)
-				numListOpsLen := len(numListOpsAllQueries)
-				strListOpsLen := len(strListOpsAllQueries)
-				lastN := 7
-				numOpsLastN := numOpsAllQueries[nonNegative(numOpsLen-lastN):numOpsLen]
-				strOpsLastN := strOpsAllQueries[nonNegative(strOpsLen-lastN):strOpsLen]
-				numListOpsLastN := numListOpsAllQueries[nonNegative(numListOpsLen-lastN):numListOpsLen]
-				strListOpsLastN := strListOpsAllQueries[nonNegative(strListOpsLen-lastN):strListOpsLen]
-				predictionsForThisQuery = builder.enumeratePredictionsForQuery(node, firstTen, i, numOpsLastN, strOpsLastN, numListOpsLastN, strListOpsLastN)
-				node.AddChildren(predictionsForThisQuery)
-			}
-			matchedPredictions := make([]*Node, 0, len(predictionsForThisQuery))
-			for _, node := range predictionsForThisQuery {
-				hits := false
-				prediction := node.Payload.(*Prediction)
-				for _, trx := range transactions {
-					if prediction.MatchesQuery(trx, trx[i]) {
-						hits = true
-						prediction.Hit()
-					}
-				}
-				if hits {
-					matchedPredictions = append(matchedPredictions, node)
-				}
-			}
-			if len(matchedPredictions) == 0 {
-				newChild := []*Node{NewNode(NewRandomPrediction(i, len(query.Arguments)), node)}
-				node.AddChildren(newChild)
-				matchedPredictions = append(matchedPredictions, newChild[0])
-			}
-			nextLevel = append(nextLevel, matchedPredictions...)
-			if len(nextLevel) > 10000 {
-				break
-			}
-		}
-		currentLevel = nextLevel
-		nextLevel = []*Node{}
-		builder.enumerateAllOperands(i, exampleTrx[i], &numOpsAllQueries, &strOpsAllQueries, &numListOpsAllQueries, &strListOpsAllQueries)
+// UpdateGraphModel updates the GraphModel with the new query.
+func (builder *ModelBuilder) UpdateGraphModel(lastNQueries []*Query, query *Query, gm *GraphModel) {
+	if builder.Current == nil {
+		builder.Current = query
+		builder.QueryQueue.MoveToNextQuery(query.QueryID)
+		return
 	}
+	edge := gm.GetEdgeList(builder.Current.QueryID).GetEdge(query.QueryID)
+	edge.IncWeight()
+	path := builder.QueryQueue.GenPath()
+	matches := edge.FindMatchingPredictions(query, lastNQueries, path)
+	if len(matches) == 0 {
+		matches = builder.enumeratePredictionsForCurrentQuery(lastNQueries)
+		edge.AddPredictions(query, path, matches)
+	}
+	for _, prediction := range matches {
+		prediction.Hit()
+	}
+	builder.Current = query
+	builder.QueryQueue.MoveToNextQuery(query.QueryID)
+}
+
+// TrainModel trains the model using the given number of queries.
+func (builder *ModelBuilder) TrainModel(gm *GraphModel, numForTraining int) {
+	spinner := sp.NewSpinnerWithProgress(19, "Updating model with query %d...", -1)
+	spinner.Start()
+	for i, query := range builder.Queries[:numForTraining] {
+		spinner.UpdateProgress(i)
+		lastNQueries := builder.Queries[nonNegative(i-LookBackLen):i]
+		builder.enumerateConstOperand(query)
+		builder.UpdateGraphModel(lastNQueries, query, gm)
+		builder.enumerateAllOperands(query)
+	}
+	spinner.Stop()
 }

@@ -2,6 +2,7 @@ package speculative
 
 import (
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -199,4 +200,138 @@ func (set *UnorderedSet) Elements() []interface{} {
 // ToString returns a string representation of the set.
 func (set *UnorderedSet) ToString() string {
 	return listToString(set.Elements())
+}
+
+// LookBackLen is number of queries to look back during prediction.
+const LookBackLen = 7
+
+// QueryPath is a sequence of query IDs
+type QueryPath [LookBackLen]int
+
+// QueryQueue moves long a list of queries, keeping the most recent N ones.
+type QueryQueue struct {
+	queue [LookBackLen]int
+	index int
+}
+
+// NewQueryQueue creates a new QueryQueue.
+func NewQueryQueue() *QueryQueue {
+	return &QueryQueue{[LookBackLen]int{}, 0}
+}
+
+// Advance the index
+func (q *QueryQueue) Advance() {
+	q.index = (q.index + 1) % LookBackLen
+}
+
+// MoveToNextQuery moves on to the next query.
+func (q *QueryQueue) MoveToNextQuery(query int) {
+	q.queue[q.index] = query
+	q.Advance()
+}
+
+// GenPath generates a QueryPath from the current queue.
+func (q *QueryQueue) GenPath() *QueryPath {
+	path := &QueryPath{}
+	for i := 0; i < LookBackLen; i++ {
+		(*path)[i] = q.queue[q.index]
+		q.Advance()
+	}
+	return path
+}
+
+// EdgeList contains a list of edges.
+type EdgeList struct {
+	Edges map[int]*Edge
+}
+
+// NewEdgeList creates a new EdgeList.
+func NewEdgeList() *EdgeList {
+	return &EdgeList{make(map[int]*Edge)}
+}
+
+// GetEdge gets the edges of the corresponding query, creating one
+// if it does not exist.
+func (el *EdgeList) GetEdge(queryID int) *Edge {
+	edge := el.Edges[queryID]
+	if edge == nil {
+		edge = NewEdge(queryID)
+		el.Edges[queryID] = edge
+	}
+	return edge
+}
+
+// FindBestPrediction returns the best prediction given a path.
+func (el *EdgeList) FindBestPrediction(path *QueryPath) *Prediction {
+	var bestMatch *Prediction
+	bestMatch = nil
+	for _, edge := range el.Edges {
+		match := edge.FindBestMatchWithPath(path)
+		if match == nil {
+			continue
+		}
+		if bestMatch == nil || match.HitCount > bestMatch.HitCount {
+			bestMatch = match
+		}
+	}
+	return bestMatch
+}
+
+// Edge is an edge in a graph.
+type Edge struct {
+	To          int
+	Weight      int
+	Predictions map[QueryPath][]*Prediction
+}
+
+// NewEdge creates a new edge.
+func NewEdge(queryID int) *Edge {
+	return &Edge{queryID, 0, make(map[QueryPath][]*Prediction)}
+}
+
+// IncWeight increments the weight of the edge.
+func (e *Edge) IncWeight() {
+	e.Weight++
+}
+
+// FindBestMatchWithPath returns the best prediction given the path.
+func (e *Edge) FindBestMatchWithPath(path *QueryPath) *Prediction {
+	predictions, exists := e.Predictions[*path]
+	if !exists {
+		fmt.Fprintf(os.Stderr, "Path not found\n")
+		// for _, predictionsForPath := range e.Predictions {
+		// 	predictions = append(predictions, predictionsForPath...)
+		// }
+	}
+	var best *Prediction
+	best = nil
+	for _, prediction := range predictions {
+		if best == nil || prediction.HitCount > best.HitCount {
+			best = prediction
+		}
+	}
+	return best
+}
+
+// FindMatchingPredictions for the given query and its preceeding queries.
+func (e *Edge) FindMatchingPredictions(query *Query, previousQueries []*Query, path *QueryPath) []*Prediction {
+	if e.To != query.QueryID {
+		return []*Prediction{}
+	}
+	predictions := e.Predictions[*path]
+	if len(predictions) == 0 {
+		return predictions
+	}
+	matches := make([]*Prediction, 0, len(predictions))
+	for _, prediction := range predictions {
+		if prediction.MatchesQuery(previousQueries, query) {
+			matches = append(matches, prediction)
+		}
+	}
+	return matches
+}
+
+// AddPredictions adds predictions for the given query under the given path.
+func (e *Edge) AddPredictions(query *Query, path *QueryPath, predictions []*Prediction) {
+	e.Predictions[*path] = append(e.Predictions[*path], predictions...)
 }
