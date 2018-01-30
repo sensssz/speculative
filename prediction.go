@@ -174,9 +174,9 @@ func (gm *GraphModel) ToString() string {
 		buffer.WriteString(fmt.Sprintf("{%v,%v},", v, el.ToString()))
 	}
 	res := buffer.String()
-	end := len(res)
-	if res[end] == ',' {
-		end--
+	end := len(res) - 1
+	if res[end] == '[' {
+		end++
 	}
 	return res[:end] + "]"
 }
