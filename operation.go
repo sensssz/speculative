@@ -445,7 +445,7 @@ func (op UnaryOperation) MatchesValue(trx []*Query, value interface{}) bool {
 func (op UnaryOperation) ToString() string {
 	// return op.Operand.ToString()
 	return fmt.Sprintf(`{
-	"type": "unary"
+	"type": "unary",
 	"operand": %s
 }`, op.Operand.ToString())
 }
