@@ -8,6 +8,32 @@ import (
 	"strings"
 )
 
+func valueToString(val interface{}) string {
+	if val == nil {
+		return "null"
+	}
+	switch val.(type) {
+	case string:
+		return fmt.Sprintf("\"%v\"", val)
+	case int:
+		return fmt.Sprintf("%v", val)
+	case float64:
+		return fmt.Sprintf("%v", val)
+	case *UnorderedSet:
+		vals := val.(*UnorderedSet).Elements()
+		if len(vals) == 0 {
+			return "[]"
+		}
+		res := "[" + valueToString(vals[0])
+		for _, value := range vals[1:] {
+			res = fmt.Sprintf("%s,%s", res, valueToString(value))
+		}
+		res += "]"
+		return res
+	}
+	return ""
+}
+
 // Query represents a SQL query.
 type Query struct {
 	QueryID   int

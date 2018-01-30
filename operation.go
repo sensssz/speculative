@@ -87,7 +87,11 @@ func (op *ConstOperand) GetValue(trx []*Query) interface{} {
 
 // ToString returns a string representation of this operand.
 func (op *ConstOperand) ToString() string {
-	return fmt.Sprintf("%v", op.Value)
+	// return fmt.Sprintf("%v", op.Value)
+	return fmt.Sprintf(`{
+	"type": "const",
+	"value": %s
+}`, valueToString(op.Value))
 }
 
 // Equal returns whether the two operands are equal.
@@ -136,7 +140,13 @@ func (op *QueryResultOperand) GetValue(trx []*Query) interface{} {
 
 // ToString returns a string representation of this operand.
 func (op *QueryResultOperand) ToString() string {
-	return fmt.Sprintf("Query%d[%d,%d]", op.QueryIndex, op.RowIndex, op.ColumnIndex)
+	// return fmt.Sprintf("Query%d[%d,%d]", op.QueryIndex, op.RowIndex, op.ColumnIndex)
+	return fmt.Sprintf(`{
+	"type": "result",
+	"query": %v,
+	"row": %v,
+	"column": %v
+}`, op.QueryID, op.RowIndex, op.ColumnIndex)
 }
 
 // Equal returns whether the two operands are equal.
@@ -183,7 +193,12 @@ func (op *QueryArgumentOperand) GetValue(trx []*Query) interface{} {
 
 // ToString returns a string representation of this operand.
 func (op *QueryArgumentOperand) ToString() string {
-	return fmt.Sprintf("Query%d(%d)", op.QueryIndex, op.ArgIndex)
+	// return fmt.Sprintf("Query%d(%d)", op.QueryIndex, op.ArgIndex)
+	return fmt.Sprintf(`{
+	"type": "arg",
+	"query": %v,
+	"arg": %v
+}`, op.QueryID, op.ArgIndex)
 }
 
 // Equal returns whether the two operands are equal.
@@ -284,7 +299,12 @@ func (op *ArgumentListOperand) GetValue(trx []*Query) interface{} {
 
 // ToString returns a string representation of this operand.
 func (op *ArgumentListOperand) ToString() string {
-	return fmt.Sprintf("Query%d(%dl)", op.QueryIndex, op.ArgIndex)
+	// return fmt.Sprintf("Query%d(%dl)", op.QueryIndex, op.ArgIndex)
+	return fmt.Sprintf(`{
+	"type": "arglist",
+	"query": %v,
+	"arg": %v
+}`, op.QueryID, op.ArgIndex)
 }
 
 // Equal returns whether the two operands are equal.
@@ -341,7 +361,12 @@ func (op *ColumnListOperand) GetValue(trx []*Query) interface{} {
 
 // ToString returns a string representation of this operand.
 func (op *ColumnListOperand) ToString() string {
-	return fmt.Sprintf("Query%d[%dl]", op.QueryIndex, op.ColumnIndex)
+	// return fmt.Sprintf("Query%d[%dl]", op.QueryIndex, op.ColumnIndex)
+	return fmt.Sprintf(`{
+	"type": "columnlist",
+	"query": %v,
+	"arg": %v
+}`, op.QueryID, op.ColumnIndex)
 }
 
 // Equal returns whether the two operands are equal.
@@ -367,6 +392,17 @@ type Operation interface {
 	ToString() string
 }
 
+func operationsToString(ops []Operation) string {
+	if len(ops) == 0 {
+		return "[]"
+	}
+	res := "[" + ops[0].ToString()
+	for _, op := range ops[1:] {
+		res += "," + op.ToString()
+	}
+	return res
+}
+
 // RandomOperation represents an operation, whose value matches anything.
 type RandomOperation struct {
 }
@@ -383,7 +419,10 @@ func (op RandomOperation) MatchesValue(trx []*Query, value interface{}) bool {
 
 // ToString returns a string representation of this operation.
 func (op RandomOperation) ToString() string {
-	return ""
+	// return ""
+	return `{
+	"type": "rand"
+}`
 }
 
 // UnaryOperation represents an unary operation.
@@ -404,7 +443,11 @@ func (op UnaryOperation) MatchesValue(trx []*Query, value interface{}) bool {
 
 // ToString returns a string representation of this operation.
 func (op UnaryOperation) ToString() string {
-	return op.Operand.ToString()
+	// return op.Operand.ToString()
+	return fmt.Sprintf(`{
+	"type": "unary"
+	"operand": %s
+}`, op.Operand.ToString())
 }
 
 // BinaryOperator represents a binary operator.

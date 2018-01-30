@@ -1,6 +1,7 @@
 package speculative
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 )
@@ -276,6 +277,21 @@ func (el *EdgeList) FindBestPrediction(path *QueryPath) *Prediction {
 	return bestMatch
 }
 
+// ToString returns a string representation of the object
+func (el *EdgeList) ToString() string {
+	var buffer bytes.Buffer
+	buffer.WriteString("[")
+	for v, e := range el.Edges {
+		buffer.WriteString(fmt.Sprintf("{%v,%v},", v, e.ToString()))
+	}
+	res := buffer.String()
+	end := len(res)
+	if res[end] == ',' {
+		end--
+	}
+	return res[:end] + "]"
+}
+
 // Edge is an edge in a graph.
 type Edge struct {
 	To          int
@@ -327,4 +343,40 @@ func (e *Edge) FindMatchingPredictions(query *Query, previousQueries []*Query, p
 // AddPredictions adds predictions for the given query under the given path.
 func (e *Edge) AddPredictions(query *Query, path *QueryPath, predictions []*Prediction) {
 	e.Predictions[*path] = append(e.Predictions[*path], predictions...)
+}
+
+func (e *Edge) predictionListToString(predictions []*Prediction) string {
+	var buffer bytes.Buffer
+	buffer.WriteString("[")
+	if len(predictions) > 0 {
+		buffer.WriteString(predictions[0].ToString())
+		for _, prediction := range predictions[1:] {
+			buffer.WriteString("," + prediction.ToString())
+		}
+	}
+	buffer.WriteString("]")
+	return buffer.String()
+}
+
+func (e *Edge) predictionMapToString() string {
+	var buffer bytes.Buffer
+	buffer.WriteString("[")
+	for path, predictions := range e.Predictions {
+		buffer.WriteString(fmt.Sprintf("{%v,%v},", path, e.predictionListToString(predictions)))
+	}
+	res := buffer.String()
+	end := len(res) - 1
+	if res[end] == '[' {
+		end++
+	}
+	return res[:end] + "]"
+}
+
+// ToString returns a string representation of the object
+func (e *Edge) ToString() string {
+	return fmt.Sprintf(`{
+	"to": %v,
+	"weight": %v,
+	"predictions": %v
+}`, e.To, e.Weight, e.predictionMapToString())
 }

@@ -2,6 +2,7 @@ package speculative
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"reflect"
@@ -62,6 +63,15 @@ func (prediction *Prediction) MatchesQuery(trx []*Query, query *Query) bool {
 		}
 	}
 	return true
+}
+
+// ToString returns s JSON representation of the object
+func (prediction *Prediction) ToString() string {
+	return fmt.Sprintf(`{
+	"query": %d,
+	"hit": %d,
+	"ops": %s
+}`, prediction.QueryID, prediction.HitCount, operationsToString(prediction.ParamOps))
 }
 
 // PredictionTrees contains all the trees for prediction
@@ -154,6 +164,21 @@ func (gm *GraphModel) Print() {
 		}
 		fmt.Fprintf(os.Stderr, "],\n")
 	}
+}
+
+// ToString returns a string representation of the model
+func (gm *GraphModel) ToString() string {
+	var buffer bytes.Buffer
+	buffer.WriteString("[")
+	for v, el := range gm.vertexEdges {
+		buffer.WriteString(fmt.Sprintf("{%v,%v},", v, el.ToString()))
+	}
+	res := buffer.String()
+	end := len(res)
+	if res[end] == ',' {
+		end--
+	}
+	return res[:end] + "]"
 }
 
 // NewPredictor creates predictor using the this prediction tree

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	sqp "github.com/sensssz/speculative"
 	sp "github.com/sensssz/spinner"
@@ -64,4 +65,9 @@ func main() {
 	fmt.Printf("Unpredictable: %v\n", unpredictale)
 	fmt.Printf("Wrong prediction: %v\n", wrongPrediction)
 	fmt.Printf("Total queries: %v\n", total)
+
+	outFile, _ := os.Create("/home/jiamin/sql_log/model" + postfix)
+	defer outFile.Close()
+
+	outFile.WriteString(gm.ToString())
 }
