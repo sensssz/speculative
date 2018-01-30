@@ -133,7 +133,7 @@ func (querySet *QuerySet) Dump(filename string) {
 	defer outfile.Close()
 	writer := bufio.NewWriter(outfile)
 	for id, template := range querySet.IDToTemplate {
-		writer.WriteString(fmt.Sprintf("%v,%v\n", id, template))
+		writer.WriteString(fmt.Sprintf("%v %v\n", id, template))
 	}
 	writer.Flush()
 }
