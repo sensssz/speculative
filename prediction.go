@@ -3,6 +3,7 @@ package speculative
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"reflect"
@@ -182,16 +183,15 @@ func (gm *GraphModel) ToString() string {
 		end++
 	}
 	res = res[:end] + "]"
-	return res
-	// var j interface{}
-	// if err := json.Unmarshal([]byte(res), &j); err != nil {
-	// 	panic(err)
-	// }
-	// bytes, err := json.MarshalIndent(j, "", "  ")
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// return string(bytes) + "\n"
+	var j interface{}
+	if err := json.Unmarshal([]byte(res), &j); err != nil {
+		panic(err)
+	}
+	bytes, err := json.MarshalIndent(j, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+	return string(bytes) + "\n"
 }
 
 // NewPredictor creates predictor using the this prediction tree
