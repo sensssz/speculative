@@ -208,6 +208,17 @@ const LookBackLen = 7
 // QueryPath is a sequence of query IDs
 type QueryPath [LookBackLen]int
 
+// ToString returns a sting representation of the object
+func (path QueryPath) ToString() string {
+	var buffer bytes.Buffer
+	buffer.WriteString(fmt.Sprintf("[%v", path[0]))
+	for _, val := range path[1:] {
+		buffer.WriteString(fmt.Sprintf(",%v", val))
+	}
+	buffer.WriteString("]")
+	return buffer.String()
+}
+
 // QueryQueue moves long a list of queries, keeping the most recent N ones.
 type QueryQueue struct {
 	queue [LookBackLen]int
@@ -368,7 +379,7 @@ func (e *Edge) predictionMapToString() string {
 		buffer.WriteString(fmt.Sprintf(`{
 	"path": %v,
 	"predictions": %v
-},`, path, e.predictionListToString(predictions)))
+},`, path.ToString(), e.predictionListToString(predictions)))
 	}
 	res := buffer.String()
 	end := len(res) - 1
