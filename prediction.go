@@ -3,6 +3,7 @@ package speculative
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"reflect"
@@ -178,7 +179,10 @@ func (gm *GraphModel) ToString() string {
 	if res[end] == '[' {
 		end++
 	}
-	return res[:end] + "]"
+	res = res[:end] + "]"
+	buffer.Reset()
+	json.Indent(&buffer, []byte(res), "", "  ")
+	return buffer.String()
 }
 
 // NewPredictor creates predictor using the this prediction tree
