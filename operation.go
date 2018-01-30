@@ -400,7 +400,7 @@ func operationsToString(ops []Operation) string {
 	for _, op := range ops[1:] {
 		res += "," + op.ToString()
 	}
-	return res
+	return res + "]"
 }
 
 // RandomOperation represents an operation, whose value matches anything.
