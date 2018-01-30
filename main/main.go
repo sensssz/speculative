@@ -70,4 +70,5 @@ func main() {
 	defer outFile.Close()
 
 	outFile.WriteString(gm.ToString())
+	modelBuilder.QuerySet.Dump("/home/jiamin/sql_log/queryset" + postfix)
 }

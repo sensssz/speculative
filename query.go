@@ -1,8 +1,10 @@
 package speculative
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -90,6 +92,7 @@ func (query *Query) GetSQL(querySet QueryManager) string {
 type QueryManager interface {
 	GetQueryID(template string) int
 	GetTemplate(queryID int) string
+	Dump(filename string)
 }
 
 // QuerySet represents a set of queries, providing both query ID and query template information.
@@ -119,6 +122,20 @@ func (querySet *QuerySet) GetQueryID(template string) int {
 // GetTemplate returns the query template given a query ID.
 func (querySet *QuerySet) GetTemplate(queryID int) string {
 	return querySet.IDToTemplate[queryID]
+}
+
+// Dump the content to a file
+func (querySet *QuerySet) Dump(filename string) {
+	outfile, err := os.Create(filename)
+	if err != nil {
+		panic(err)
+	}
+	defer outfile.Close()
+	writer := bufio.NewWriter(outfile)
+	for id, template := range querySet.IDToTemplate {
+		writer.WriteString(fmt.Sprintf("%v,%v\n", id, template))
+	}
+	writer.Flush()
 }
 
 // QueryParser is used to parse SQL query text.
