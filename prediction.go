@@ -3,7 +3,6 @@ package speculative
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"os"
 	"reflect"
@@ -172,7 +171,10 @@ func (gm *GraphModel) ToString() string {
 	var buffer bytes.Buffer
 	buffer.WriteString("[")
 	for v, el := range gm.vertexEdges {
-		buffer.WriteString(fmt.Sprintf("{%v,%v},", v, el.ToString()))
+		buffer.WriteString(fmt.Sprintf(`{
+	"vertex": %v,
+	"edgelist": %v
+},`, v, el.ToString()))
 	}
 	res := buffer.String()
 	end := len(res) - 1
@@ -180,9 +182,16 @@ func (gm *GraphModel) ToString() string {
 		end++
 	}
 	res = res[:end] + "]"
-	buffer.Reset()
-	json.Indent(&buffer, []byte(res), "", "  ")
-	return buffer.String()
+	return res
+	// var j interface{}
+	// if err := json.Unmarshal([]byte(res), &j); err != nil {
+	// 	panic(err)
+	// }
+	// bytes, err := json.MarshalIndent(j, "", "  ")
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// return string(bytes) + "\n"
 }
 
 // NewPredictor creates predictor using the this prediction tree

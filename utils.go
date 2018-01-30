@@ -282,7 +282,10 @@ func (el *EdgeList) ToString() string {
 	var buffer bytes.Buffer
 	buffer.WriteString("[")
 	for v, e := range el.Edges {
-		buffer.WriteString(fmt.Sprintf("{%v,%v},", v, e.ToString()))
+		buffer.WriteString(fmt.Sprintf(`{
+	"vertex": %v,
+	"edge": %v
+},`, v, e.ToString()))
 	}
 	res := buffer.String()
 	end := len(res) - 1
@@ -362,7 +365,10 @@ func (e *Edge) predictionMapToString() string {
 	var buffer bytes.Buffer
 	buffer.WriteString("[")
 	for path, predictions := range e.Predictions {
-		buffer.WriteString(fmt.Sprintf("{%v,%v},", path, e.predictionListToString(predictions)))
+		buffer.WriteString(fmt.Sprintf(`{
+	"path": %v,
+	"predictions": %v
+},`, path, e.predictionListToString(predictions)))
 	}
 	res := buffer.String()
 	end := len(res) - 1
