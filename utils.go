@@ -394,6 +394,6 @@ func (e *Edge) ToString() string {
 	return fmt.Sprintf(`{
 	"to": %v,
 	"weight": %v,
-	"predictions": %v
+	"prediction_map": %v
 }`, e.To, e.Weight, e.predictionMapToString())
 }

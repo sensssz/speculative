@@ -144,9 +144,10 @@ func (op *QueryResultOperand) ToString() string {
 	return fmt.Sprintf(`{
 	"type": "result",
 	"query": %v,
+	"index": %v,
 	"row": %v,
 	"column": %v
-}`, op.QueryID, op.RowIndex, op.ColumnIndex)
+}`, op.QueryID, op.QueryIndex, op.RowIndex, op.ColumnIndex)
 }
 
 // Equal returns whether the two operands are equal.
@@ -197,8 +198,9 @@ func (op *QueryArgumentOperand) ToString() string {
 	return fmt.Sprintf(`{
 	"type": "arg",
 	"query": %v,
+	"index": %v,
 	"arg": %v
-}`, op.QueryID, op.ArgIndex)
+}`, op.QueryID, op.QueryIndex, op.ArgIndex)
 }
 
 // Equal returns whether the two operands are equal.
@@ -303,8 +305,9 @@ func (op *ArgumentListOperand) ToString() string {
 	return fmt.Sprintf(`{
 	"type": "arglist",
 	"query": %v,
+	"index": %v,
 	"arg": %v
-}`, op.QueryID, op.ArgIndex)
+}`, op.QueryID, op.QueryIndex, op.ArgIndex)
 }
 
 // Equal returns whether the two operands are equal.
@@ -365,8 +368,9 @@ func (op *ColumnListOperand) ToString() string {
 	return fmt.Sprintf(`{
 	"type": "columnlist",
 	"query": %v,
-	"arg": %v
-}`, op.QueryID, op.ColumnIndex)
+	"index": %v,
+	"column": %v
+}`, op.QueryID, op.QueryIndex, op.ColumnIndex)
 }
 
 // Equal returns whether the two operands are equal.
